@@ -1,4 +1,4 @@
-# KCM — Kiron Client Manager
+# KRM — Kiron Relations Manager
 
 In-house CRM to replace HubSpot, built as a tile in the Employee Tools portal.
 
