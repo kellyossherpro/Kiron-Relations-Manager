@@ -1,14 +1,14 @@
 # KRM — Kiron Relations Manager
 
-In-house CRM to replace HubSpot, built as a tile in the Employee Tools portal.
+In-house CRM to replace HubSpot, built as a standalone app (decision 2026-10-07 — see Decision log in `crm-design.md`).
 
 ## Documents
 
 - **crm-design.md** — design notes: the why, the shape, the architecture.
-- **crm-questions-for-patrick.md** — agenda for the portal-owner conversation.
+- **crm-questions-for-patrick.md** — *superseded* (portal plan dropped); kept for reference.
 - **crm-definition-of-done.md** — checklist that triggers cutover from HubSpot.
 - **sales_pipeline_process.docx** — canonical sales pipeline spec (the source of truth for stage-gate logic).
 
 ## Status
 
-In design. No code yet. Solo build with AI assistance, Patrick (portal owner) as the review-and-deploy gate.
+In design (blueprint stage). No code yet. Kelly explains, Claude codes; standalone app.

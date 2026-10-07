@@ -2,6 +2,16 @@
 
 > Working document. Captures the thinking behind replacing HubSpot with an in-house CRM module inside the Employee Tools portal (`employee-tools.kironinteractive.com`).
 
+## Decision log
+
+Newest first. When a decision here contradicts a section below, the decision wins until that section is rewritten.
+
+- **2026-10-07 — Standalone app, not a portal tile.** The Employee Tools portal plan (and Patrick as review/deploy gate) is dropped. Kelly + Claude build, host and run the CRM as its own app. Consequences:
+  - We own login, hosting, database, backups, scheduled jobs and email sending — no portal to inherit them from.
+  - The "unified Company page" pulling Proposals / NDAs / KYC from portal tables is no longer free; it becomes an integration (or is dropped).
+  - The Proposals and Contracts zaps do **not** disappear automatically: the portal's document generation still needs deal data, now from our CRM instead of HubSpot.
+  - Sections below that assume the portal (Architecture, Cutover, Phase 0, `crm-questions-for-patrick.md`) are superseded and will be rewritten as the blueprint firms up.
+
 ## Why we're doing this
 
 - **HubSpot is too complex** for the team — busy UI, too many concepts most people don't use.
