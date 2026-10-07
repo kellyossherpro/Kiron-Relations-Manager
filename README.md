@@ -9,7 +9,7 @@ In-house CRM to replace HubSpot, built as a standalone app (decision 2026-10-07 
 - **crm-design.md** — design notes: the why, the shape, the architecture.
 - **crm-questions-for-patrick.md** — *superseded* (portal plan dropped); kept for reference.
 - **crm-definition-of-done.md** — checklist that triggers cutover from HubSpot.
-- **sales_pipeline_process.docx** — canonical sales pipeline spec (the source of truth for stage-gate logic).
+- **sales_pipeline_process.docx** — *retired*: out of date. The pipeline source of truth is the sales playbook (`kiron-sales-playbook`).
 
 ## Status
 

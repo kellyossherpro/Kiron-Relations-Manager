@@ -6,6 +6,16 @@
 
 Newest first. When a decision here contradicts a section below, the decision wins until that section is rewritten.
 
+- **2026-10-07 — Blueprint round 3.**
+  - Pipeline source of truth confirmed: the sales playbook / HubSpot Deal Process doc. `sales_pipeline_process.docx` is retired.
+  - Owners can still move their own deals to On Hold / Closed Lost / Terminated via the reason fields; only admins move between normal stages.
+  - On Hold over 60 days → Closed Lost automatically (reason + date filled). Every automatic move is shown on the notification board and the deal timeline.
+  - CRM connects to Asana directly (today it's Zapier); HubSpot-to-Asana zaps switched off at cutover.
+  - Outlook email logging moves **before** cutover; launch reports include email counts.
+  - Quotes parked (not in launch scope).
+  - Every deal gets a RICE evaluation button linking to the portal's RICE page.
+  - Tiers are MRR ranges (T1 $50k+, T2 $10k–50k, T3 $1k–10k, T4 $0–1k); proposal: tier is set from the monthly amount automatically (awaiting Kelly).
+  - Open: HubSpot notice period (urgent, possibly 45–90 days before 31 Dec), Zapier plan and what else uses it, tier rule.
 - **2026-10-07 — Blueprint round 2.**
   - **Timeline:** renew HubSpot once on 31 Dec 2026 (fewest seats allowed), switch over before the June 2027 renewal. Contract notice period still to confirm.
   - **Pipeline source of truth:** the sales playbook (`kiron-sales-playbook`) matches live HubSpot; `sales_pipeline_process.docx` is out of date (pending Kelly's confirmation, Q39). Stages: Lead → Customer Engagement → Qualified Lead → Feasibility (RICE, custom only) → Proposal → Legal & Compliance (direct only) → Closed Won → Live Direct / Live via Aggregator, plus Addendum loop for live clients, and On Hold / Closed Lost / Terminated.
