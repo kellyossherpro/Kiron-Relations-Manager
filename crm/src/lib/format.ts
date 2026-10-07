@@ -16,6 +16,25 @@ export const DEAL_CONTACT_ROLE_LABEL: Record<string, string> = {
   other: "Other",
 };
 
+// From the sales playbook's "Addendums & Changes".
+export const ADDENDUM_TYPE_LABEL: Record<string, string> = {
+  commercial: "Commercial / Pricing",
+  new_product: "New Product",
+  platform: "Platform / Technical",
+  market: "Market / Territory",
+  term: "Term / Renewal",
+  legal_entity: "Legal Entity",
+};
+
+export const ADDENDUM_TYPE_HINT: Record<string, string> = {
+  commercial: "A change to the money: fee or rate, revenue-share %, setup fee, monthly minimum or billing currency.",
+  new_product: "Adding a new product or game / event type to this live client.",
+  platform: "A change to how the client is delivered: new platform or channel, a dedicated-server change, or IP whitelisting.",
+  market: "A new country or jurisdiction the client will operate in, plus any licence or tax that comes with it.",
+  term: "A change to the agreement's length: extending the term, changing the notice period, or a renewal.",
+  legal_entity: "A change to who holds the contract: entity name, registered address, registration number, or the Kiron contracting entity.",
+};
+
 export const COMPANY_TYPE_LABEL: Record<string, string> = { retail: "Retail", online: "Online", both: "Retail and online" };
 
 export function money(v: unknown) {

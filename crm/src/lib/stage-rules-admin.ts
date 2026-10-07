@@ -5,13 +5,18 @@ import { PermissionError, RuleError } from "./errors";
 import { canManageUsersAndFields, type Actor } from "./permissions";
 import { loadPipelineConfig } from "./stage-engine";
 
+// Deals enter and leave the Addendum stage only through the addendum loop (src/lib/addendums.ts).
+const ADDENDUM_STAGE_MESSAGE = "The Addendum stage runs by itself: deals go in when an addendum is raised and come back to Live when it's done.";
+
 function requireAdmin(actor: Actor) {
   if (!canManageUsersAndFields(actor)) throw new PermissionError("Only an admin can change the stage rules.");
 }
 
 async function validate(input: { stageKey: string; whenField?: string | null; whenValue?: string | null }) {
   const cfg = await loadPipelineConfig(db);
-  if (!cfg.stages.some((s) => s.key === input.stageKey)) throw new RuleError("That stage doesn't exist.");
+  const stage = cfg.stages.find((s) => s.key === input.stageKey);
+  if (!stage) throw new RuleError("That stage doesn't exist.");
+  if (stage.kind === "change") throw new RuleError(ADDENDUM_STAGE_MESSAGE);
   if (input.whenField) {
     if (!cfg.fields.some((f) => f.key === input.whenField)) throw new RuleError("Pick the field the condition depends on.");
     if (!input.whenValue?.trim()) throw new RuleError("Say which value the condition needs, e.g. Custom or Yes.");
@@ -56,7 +61,9 @@ export async function removeRequirement(actor: Actor, id: string) {
 export async function addTransition(actor: Actor, input: { fromStage: string; toStage: string; whenField?: string | null; whenValue?: string | null }) {
   requireAdmin(actor);
   const cfg = await validate({ stageKey: input.fromStage, whenField: input.whenField, whenValue: input.whenValue });
-  if (!cfg.stages.some((s) => s.key === input.toStage)) throw new RuleError("Pick the stage the deal moves to.");
+  const to = cfg.stages.find((s) => s.key === input.toStage);
+  if (!to) throw new RuleError("Pick the stage the deal moves to.");
+  if (to.kind === "change") throw new RuleError(ADDENDUM_STAGE_MESSAGE);
   if (input.fromStage === input.toStage) throw new RuleError("A deal can't move to the stage it's already in.");
   const existing = cfg.transitions.filter((t) => t.fromStage === input.fromStage);
   // Conditional routes are checked before the "otherwise" route, so add them at the front.

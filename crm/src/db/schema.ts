@@ -284,3 +284,36 @@ export const notifications = pgTable(
   },
   (t) => [index("notifications_user_idx").on(t.userId, t.readAt), index("notifications_deal_idx").on(t.dealId, t.kind)],
 );
+
+// ---------- addendums ----------
+
+// A change to money or the contract on a live deal (see the sales playbook's
+// "Addendums & Changes"). Operational changes are tasks, not addendums.
+export const ADDENDUM_TYPES = ["commercial", "new_product", "platform", "market", "term", "legal_entity"] as const;
+export type AddendumType = (typeof ADDENDUM_TYPES)[number];
+export const ADDENDUM_STATUSES = ["open", "done", "cancelled"] as const;
+export type AddendumStatus = (typeof ADDENDUM_STATUSES)[number];
+
+// One row per trip through the addendum loop. Raising one moves the deal to the
+// Addendum stage; finishing or cancelling it sends the deal back to `from_stage`.
+// Past addendums stay here, so nothing on the deal needs resetting.
+export const addendums = pgTable(
+  "addendums",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dealId: uuid("deal_id").notNull().references(() => deals.id),
+    type: text("type").$type<AddendumType>().notNull(),
+    details: text("details").notNull(),
+    fromStage: text("from_stage").notNull().references(() => pipelineStages.key),
+    status: text("status").$type<AddendumStatus>().notNull().default("open"),
+    raisedBy: uuid("raised_by").references(() => users.id),
+    raisedAt: timestamp("raised_at", { withTimezone: true }).notNull().defaultNow(),
+    closedBy: uuid("closed_by").references(() => users.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closeNote: text("close_note"),
+  },
+  (t) => [
+    index("addendums_deal_idx").on(t.dealId, t.raisedAt),
+    uniqueIndex("addendums_one_open").on(t.dealId).where(sql`${t.status} = 'open'`),
+  ],
+);

@@ -62,6 +62,14 @@ export function AdminStageRules({ stages, fields, requirements, routes }: { stag
           const reqs = requirements.filter((r) => r.stageKey === s.key);
           const out = routes.filter((r) => r.fromStage === s.key);
           const isOpen = open === s.key;
+          if (s.kind === "change") {
+            return (
+              <li key={s.key} className="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                <span className="font-bold">{i + 1}. {s.label}</span>
+                <span className="text-right text-xs text-muted">Runs by itself: deals go in when an addendum is raised and back to Live when it&rsquo;s done</span>
+              </li>
+            );
+          }
           return (
             <li key={s.key} className="rounded-lg border border-line">
               <button className="flex w-full items-center justify-between gap-3 p-3 text-left" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : s.key)}>
@@ -172,7 +180,7 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
             <label className="label" htmlFor={`${stage.key}-to`}>Add a route to</label>
             <select id={`${stage.key}-to`} className="input" value={to} onChange={(e) => setTo(e.target.value)}>
               <option value="">Choose a stage</option>
-              {stages.filter((s) => s.key !== stage.key).map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              {stages.filter((s) => s.key !== stage.key && s.kind !== "change").map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
           <ConditionPicker idPrefix={`${stage.key}-route`} fields={fields} field={routeWhen} value={routeValue} onField={setRouteWhen} onValue={setRouteValue} />

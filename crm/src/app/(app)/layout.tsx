@@ -4,10 +4,11 @@ import { NavLink } from "@/components/nav-link";
 import { ROLE_LABEL } from "@/lib/format";
 import { requireActor } from "@/lib/session";
 import { unreadCount } from "@/lib/stage-rules-admin";
+import { openAddendumCount } from "@/lib/addendums";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireActor();
-  const unread = await unreadCount(actor.id);
+  const [unread, addendums] = await Promise.all([unreadCount(actor.id), openAddendumCount()]);
   return (
     <div className="min-h-screen lg:flex">
       <aside className="bg-black lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col">
@@ -22,6 +23,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLink href="/companies">Companies</NavLink>
           <NavLink href="/contacts">Contacts</NavLink>
           <NavLink href="/tasks">My tasks</NavLink>
+          <NavLink href="/addendums">
+            Addendums
+            {addendums > 0 && <span className="ml-auto rounded-full bg-warn-soft px-2 text-xs text-warn tabular-nums" aria-label={`${addendums} in progress`}>{addendums}</span>}
+          </NavLink>
           <NavLink href="/notifications">
             Notifications
             {unread > 0 && <span className="ml-auto rounded-full bg-white px-2 text-xs text-ink tabular-nums" aria-label={`${unread} unread`}>{unread}</span>}

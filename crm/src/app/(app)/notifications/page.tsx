@@ -11,6 +11,9 @@ const KIND_LABEL: Record<string, string> = {
   stage_stale: "Stuck",
   on_hold_auto: "On hold",
   closed_lost_auto: "Closed lost",
+  addendum_raised: "Addendum",
+  addendum_done: "Addendum done",
+  addendum_cancelled: "Addendum cancelled",
 };
 
 export default async function NotificationsPage() {
@@ -27,7 +30,7 @@ export default async function NotificationsPage() {
           </form>
         )}
       </div>
-      <p className="text-sm text-muted">Everything KRM does by itself to your deals shows up here: deals moving on, deals that have been stuck for 30 days, and deals moved to On Hold or Closed Lost.</p>
+      <p className="text-sm text-muted">Everything KRM does by itself to your deals shows up here: deals moving on, deals that have been stuck for 30 days, deals moved to On Hold or Closed Lost, and addendums raised or finished on your deals.</p>
       {items.length === 0 ? (
         <div className="card p-10 text-center text-sm text-muted">Nothing yet.</div>
       ) : (

@@ -52,3 +52,13 @@ export function canMoveStage(actor: Actor, record: { ownerId: string | null }, t
 export function canManageUsersAndFields(actor: Actor) {
   return actor.role === "admin";
 }
+
+// Addendums: whoever can edit a live deal raises one. Finishing or cancelling it is
+// done by the account management team (any account manager) or anyone who can edit the deal.
+export function canRaiseAddendum(actor: Actor, record: { ownerId: string | null }, opts: { collaboratorIds?: string[] } = {}) {
+  return canEditRecord(actor, record, opts);
+}
+
+export function canFinishAddendum(actor: Actor, record: { ownerId: string | null }, opts: { collaboratorIds?: string[] } = {}) {
+  return actor.role === "account_manager" || canEditRecord(actor, record, opts);
+}

@@ -15,10 +15,15 @@ export function StageMover({ dealId, current, stages, allowed, checklist, nextLa
   const [reason, setReason] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const path = stages.filter((s) => ["open", "won", "live"].includes(s.kind) && s.key !== "live_aggregator");
+  // The bar shows the normal path with one "Live" step; Live via Aggregator and a deal
+  // going through an addendum both count as live.
+  const firstLive = stages.find((s) => s.kind === "live");
+  const path = stages.filter((s) => ["open", "won"].includes(s.kind) || s === firstLive);
   const currentStage = stages.find((s) => s.key === current);
-  const currentIndex = path.findIndex((s) => s.key === current);
-  const choices = stages.filter((s) => allowed.includes(s.key) && s.key !== current);
+  const inAddendum = currentStage?.kind === "change";
+  const currentIndex = currentStage?.kind === "live" || inAddendum ? path.indexOf(firstLive!) : path.findIndex((s) => s.key === current);
+  // Addendum is entered with "Raise an addendum", never picked here.
+  const choices = stages.filter((s) => allowed.includes(s.key) && s.key !== current && s.kind !== "change");
 
   function submit() {
     start(async () => {
@@ -52,12 +57,16 @@ export function StageMover({ dealId, current, stages, allowed, checklist, nextLa
         {path.map((s, i) => (
           <li key={s.key} className="flex-1" title={s.label}>
             <div className={`h-2 rounded-full ${currentIndex >= 0 && i <= currentIndex ? "bg-brand" : "bg-line"}`} />
-            <span className="sr-only">{s.label}{s.key === current ? " (current)" : ""}</span>
+            <span className="sr-only">{s === firstLive ? "Live" : s.label}{i === currentIndex ? " (current)" : ""}</span>
           </li>
         ))}
       </ol>
       <div className="mt-4">
-        {checklist.length === 0 ? (
+        {inAddendum ? (
+          <p className="text-sm text-muted">This deal is going through an addendum (see below). It goes back to Live by itself when the addendum is done.</p>
+        ) : currentStage?.kind === "live" && checklist.length === 0 ? (
+          <p className="text-sm text-muted">This client is live. Changes to money or the contract go through an addendum (see below).</p>
+        ) : checklist.length === 0 ? (
           <p className="text-sm text-muted">No rules for this stage yet, so the deal only moves when someone moves it.</p>
         ) : (
           <>

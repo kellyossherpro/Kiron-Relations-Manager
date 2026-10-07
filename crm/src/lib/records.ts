@@ -36,7 +36,7 @@ export async function collaboratorIds(tx: Tx | typeof db, dealId: string): Promi
 
 export const readField = readFieldValue;
 
-async function audit(tx: Tx, actor: Actor | null, objectType: string, objectId: string, action: string, field: string | null, oldValue: unknown, newValue: unknown) {
+export async function audit(tx: Tx, actor: Actor | null, objectType: string, objectId: string, action: string, field: string | null, oldValue: unknown, newValue: unknown) {
   await tx.execute(sql`
     insert into audit_log (object_type, object_id, action, field, old_value, new_value, user_id)
     values (${objectType}, ${objectId}, ${action}, ${field}, ${JSON.stringify(oldValue ?? null)}::jsonb, ${JSON.stringify(newValue ?? null)}::jsonb, ${actor?.id ?? null})`);
@@ -49,7 +49,7 @@ function setClause(assignments: [string, unknown][]): SQL {
   );
 }
 
-async function withTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+export async function withTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
   try {
     return await db.transaction(fn);
   } catch (e) {
@@ -179,7 +179,7 @@ export async function moveDealStage(
   const reason = opts.reason.trim();
   return withTx(async (tx) => {
     const row = await lockRow(tx, "deal", dealId);
-    const stage = await tx.execute(sql`select key, label from pipeline_stages where key = ${toStage}`);
+    const stage = await tx.execute(sql`select key, label, kind from pipeline_stages where key = ${toStage}`);
     if (!stage.rows[0]) throw new RuleError("That stage doesn't exist.");
     const collabs = await collaboratorIds(tx, dealId);
     if (!canMoveStage(actor, { ownerId: row.owner_id }, toStage, { collaboratorIds: collabs })) {
@@ -191,10 +191,16 @@ export async function moveDealStage(
     }
     if (row.stage_key !== opts.expectedStage) return { status: "conflict", currentStage: row.stage_key as string };
     if (row.stage_key === toStage) return { status: "unchanged" };
+    // The Addendum stage is entered by raising an addendum, so its type and details are always recorded.
+    if (stage.rows[0].kind === "change") throw new RuleError("Use \"Raise an addendum\" on the deal instead, so the type and details are recorded.");
     if (!reason) throw new RuleError("Give a reason for moving the deal. It's kept in the deal's history.", "reason");
 
     await tx.execute(sql`update deals set stage_key = ${toStage}, stage_entered_at = now(), version = version + 1, updated_at = now() where id = ${dealId}`);
     await audit(tx, actor, "deal", dealId, "stage", "stage", row.stage_key, { stage: toStage, reason });
+    // Moving a deal out of Addendum by hand (e.g. to Terminated) cancels the addendum in progress.
+    await tx.execute(sql`
+      update addendums set status = 'cancelled', closed_by = ${actor.id}, closed_at = now(), close_note = ${`Deal moved to ${stage.rows[0].label} by hand: ${reason}`}
+      where deal_id = ${dealId} and status = 'open'`);
     return { status: "moved" };
   });
 }

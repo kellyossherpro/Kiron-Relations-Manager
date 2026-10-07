@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { OBJECT_TYPES, type ActivityType, type FieldType, type ObjectType, type Role } from "@/db/schema";
 import { deleteActivity, logActivity, setTaskDone } from "@/lib/activities";
+import { cancelAddendum, finishAddendum, raiseAddendum } from "@/lib/addendums";
 import { createFieldDefinition, createFirstAdmin, createUser, updateFieldDefinition, updateUser } from "@/lib/admin";
 import { NotFoundError, PermissionError, RuleError } from "@/lib/errors";
 import { FieldError } from "@/lib/fields";
@@ -128,6 +129,29 @@ export async function restoreRecordAction(objectType: ObjectType, id: string): P
   checkType(objectType);
   const res = await attempt(() => restoreRecord(actor, objectType, id));
   refresh(objectType, id);
+  return res;
+}
+
+// ---------- addendums ----------
+
+export async function raiseAddendumAction(dealId: string, input: { type: string; details: string }): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => raiseAddendum(actor, dealId, input));
+  refresh();
+  return res;
+}
+
+export async function finishAddendumAction(addendumId: string, note: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => finishAddendum(actor, addendumId, note));
+  refresh();
+  return res;
+}
+
+export async function cancelAddendumAction(addendumId: string, reason: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => cancelAddendum(actor, addendumId, reason));
+  refresh();
   return res;
 }
 

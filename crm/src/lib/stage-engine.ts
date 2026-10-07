@@ -191,7 +191,7 @@ export async function missingByDeal(): Promise<Record<string, { missing: number;
 }
 
 // Who hears about a deal: its owner and collaborators.
-async function dealAudience(q: Q, dealId: string, ownerId: string | null) {
+export async function dealAudience(q: Q, dealId: string, ownerId: string | null) {
   const res = await q.execute(sql`select user_id from deal_collaborators where deal_id = ${dealId}`);
   return [...new Set([ownerId, ...res.rows.map((r) => r.user_id as string)].filter(Boolean) as string[])];
 }

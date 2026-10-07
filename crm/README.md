@@ -24,6 +24,7 @@ npm run dev                   # http://localhost:3000 → "Set up KRM"
 | `npm run db:migrate` | Applies migrations |
 | `npm run e2e` | Clicks through the app in a browser on an empty dev database and saves screenshots to `e2e/screenshots/` (example data only) |
 | `npm run e2e:rules` | Same, for the stage rules (needs `CRON_SECRET` in the environment) |
+| `npm run e2e:addendum` | Same, for the addendum loop |
 | `npm run rules:daily` | Runs the daily rules by hand (30-day reminders, 60-day On Hold, 60 days On Hold → Closed Lost) |
 
 ## How it's built
@@ -36,6 +37,7 @@ src/lib/permissions.ts  who can do what (one place)
 src/lib/fields.ts       built-in fields + admin-defined fields, value checking
 src/lib/stage-engine.ts what each stage needs, auto-advance, daily 30/60-day rules
 src/lib/stage-rules-admin.ts  admin edits to stage rules; notifications
+src/lib/addendums.ts    the addendum loop: raise on a live deal, mark done or cancel, back to Live
 src/lib/links.ts        contacts↔companies, deal contacts with roles, collaborators
 src/lib/activities.ts   notes, calls, meetings, tasks
 src/lib/admin.ts        first admin, people, field definitions
@@ -57,5 +59,9 @@ Rules that matter:
 - **Stage rules** (admin-set): requirements per stage (+ optional "only when field is value") and
   ordered routes to the next stage. A stage with no requirements never moves on its own. Auto-advance
   runs inside the same transaction as the save that completed the stage, so it happens exactly once.
+- **Addendums**: raising one on a live deal (type + details) moves it to Addendum; marking it done or
+  cancelling it sends the deal back to the Live stage it came from. Each addendum is its own row in
+  `addendums`, so nothing on the deal is reset and past addendums stay listed. The Addendum stage can't be
+  picked in "Move deal" or used in stage rules; moving a deal out of it by hand cancels the open addendum.
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.
 - **Sign-in** is a development picker (`AUTH_MODE=dev`). Microsoft sign-in replaces it before go-live.

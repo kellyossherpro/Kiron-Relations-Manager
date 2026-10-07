@@ -5,7 +5,7 @@ import type { Actor } from "@/lib/permissions";
 
 // Empties every table except the stage configuration.
 export async function resetDb() {
-  await db.execute(sql`truncate notifications, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
+  await db.execute(sql`truncate addendums, notifications, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
 }
 
 let n = 0;

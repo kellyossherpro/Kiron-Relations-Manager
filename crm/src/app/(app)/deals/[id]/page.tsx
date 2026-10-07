@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActivityPanel } from "@/components/activity-panel";
+import { AddendumPanel } from "@/components/addendum-panel";
 import { DeleteRecord } from "@/components/delete-record";
 import { HistoryList } from "@/components/history-list";
 import { LinkAdder, UnlinkButton } from "@/components/link-adder";
@@ -9,7 +10,8 @@ import { StageMover } from "@/components/stage-mover";
 import { DEAL_CONTACT_ROLES } from "@/db/schema";
 import { NotFoundError } from "@/lib/errors";
 import { DEAL_CONTACT_ROLE_LABEL, plural } from "@/lib/format";
-import { canDelete, canEditRecord, canLogActivity, canMoveStage, isManager } from "@/lib/permissions";
+import { dealAddendums } from "@/lib/addendums";
+import { canDelete, canEditRecord, canFinishAddendum, canLogActivity, canMoveStage, canRaiseAddendum, isManager } from "@/lib/permissions";
 import { companyOptions, contactOptions, dealDaysInStage, getDealLinks, getRecord, listActivities, listHistory, listStages, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
 import { evaluateDeal } from "@/lib/stage-engine";
@@ -26,7 +28,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     throw e;
   }
   const { row, specs, values } = record;
-  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation] = await Promise.all([
+  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation, addendums] = await Promise.all([
     getDealLinks(id),
     listStages(),
     listUsers(),
@@ -36,6 +38,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     listHistory("deal", id),
     dealDaysInStage(id),
     evaluateDeal(id),
+    dealAddendums(id),
   ]);
   const collabIds = links.collaborators.map((c) => c.id);
   const ownerId = row.owner_id;
@@ -44,6 +47,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const userOptions = users.map((u) => ({ id: u.id, label: u.name }));
   const lookups = { companies, users: userOptions };
   const stage = stages.find((s) => s.key === row.stage_key);
+  const stageLabels = Object.fromEntries(stages.map((s) => [s.key, s.label]));
+  const showAddendums = stage?.kind === "live" || stage?.kind === "change" || addendums.length > 0;
   const names = Object.fromEntries([...userOptions, ...companies].map((o) => [o.id, o.label]));
 
   return (
@@ -62,6 +67,17 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">
           <StageMover dealId={id} current={String(row.stage_key)} stages={stages} allowed={allowedStages} checklist={evaluation?.requirements ?? []} nextLabel={evaluation?.next?.label ?? null} />
+          {showAddendums && (
+            <AddendumPanel
+              dealId={id}
+              isLive={stage?.kind === "live"}
+              liveLabel={stage?.kind === "live" ? stage.label : (stages.find((s) => s.kind === "live")?.label ?? "Live")}
+              stageLabels={stageLabels}
+              canRaise={canRaiseAddendum(actor, { ownerId }, { collaboratorIds: collabIds })}
+              canFinish={canFinishAddendum(actor, { ownerId }, { collaboratorIds: collabIds })}
+              items={addendums.map((a) => ({ ...a, raisedAt: String(a.raisedAt), closedAt: a.closedAt ? String(a.closedAt) : null }))}
+            />
+          )}
           <RecordFields objectType="deal" recordId={id} fields={clientFields(actor, "deal", ownerId, specs, collabIds)} values={values} lookups={lookups} />
           <ActivityPanel parent={{ dealId: id }} items={activities} users={userOptions} me={{ id: actor.id, isAdmin: isManager(actor) }} canLog={canLogActivity(actor)} />
         </div>
@@ -124,7 +140,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           <details className="card p-5">
             <summary className="h2 cursor-pointer">History</summary>
             <div className="mt-3">
-              <HistoryList entries={history} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={Object.fromEntries(stages.map((s) => [s.key, s.label]))} names={names} />
+              <HistoryList entries={history} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={stageLabels} names={names} />
             </div>
           </details>
         </div>
