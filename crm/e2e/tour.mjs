@@ -93,7 +93,7 @@ await sam.fill("#f-name", "New Example Ltd");
 await sam.selectOption("#f-companyType", "online");
 await sam.click("text=Create company");
 await sam.waitForSelector("text=Online companies need a website");
-await part(sam, "form", "company-validation");
+await part(sam, "main form", "company-validation");
 
 step("tasks, search, notifications");
 await sam.goto(`${B}/tasks`);
