@@ -68,3 +68,21 @@ Rules that matter:
   picked in "Move deal" or used in stage rules; moving a deal out of it by hand cancels the open addendum.
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.
 - **Sign-in** is a development picker (`AUTH_MODE=dev`). Microsoft sign-in replaces it before go-live.
+
+## Online test version (Vercel + Supabase)
+
+A test copy with made-up data, behind a shared password. Vercel runs `npm run vercel-build`, which
+applies migrations, loads the example company if `EXAMPLE_DATA=1` and the database is empty, then builds.
+Project settings: Root Directory `crm`. Environment variables:
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | Supabase → Connect → **Session pooler** connection string, with the database password filled in |
+| `AUTH_MODE` | `dev` (the "pick who you are" sign-in; test only) |
+| `SITE_PASSWORD` | the password testers type first |
+| `CRON_SECRET` | any long random string (Vercel sends it to `/api/cron/daily`, scheduled in `vercel.json`) |
+| `EXAMPLE_DATA` | `1` to load the example company into an empty database |
+
+Before any real data: Microsoft sign-in instead of `AUTH_MODE=dev`, remove `SITE_PASSWORD`, and verify
+Supabase's certificate in `src/db/config.ts`.
+

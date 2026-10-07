@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { OBJECT_TYPES, type ActivityType, type FieldType, type ObjectType, type Role } from "@/db/schema";
 import { deleteActivity, logActivity, setTaskDone } from "@/lib/activities";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/links";
 import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord, type SaveResult } from "@/lib/records";
 import { requireActor, signInAs, signOut } from "@/lib/session";
+import { GATE_COOKIE, gateToken, passwordMatches, safeNext } from "@/lib/site-gate";
 import { addRequirement, addTransition, markAllRead, removeRequirement, removeTransition, type RequirementInput } from "@/lib/stage-rules-admin";
 
 // Every action checks who is signed in, then calls the same tested functions the
@@ -53,6 +55,15 @@ function refresh(objectType?: ObjectType, id?: string) {
 }
 
 // ---------- sign-in ----------
+
+// The test version's shared password (see src/proxy.ts). Comes before sign-in, so no actor yet.
+export async function enterSiteAction(_: unknown, form: FormData): Promise<ActionResult> {
+  const password = process.env.SITE_PASSWORD;
+  if (!password) redirect("/");
+  if (!passwordMatches(String(form.get("password") ?? ""), password)) return { ok: false, error: "That password isn't right. Check it and try again." };
+  (await cookies()).set(GATE_COOKIE, gateToken(password), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+  redirect(safeNext(form.get("next")));
+}
 
 export async function setupAction(_: unknown, form: FormData): Promise<ActionResult> {
   const res = await attempt(async () => {

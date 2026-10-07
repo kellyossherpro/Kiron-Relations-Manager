@@ -16,7 +16,8 @@
     "e2e:rules": "node e2e/stage-rules.mjs",
     "e2e:addendum": "node e2e/addendum.mjs",
     "example:load": "tsx --tsconfig tsconfig.json src/scripts/example-data.ts",
-    "example:clear": "tsx --tsconfig tsconfig.json src/scripts/example-data.ts clear"
+    "example:clear": "tsx --tsconfig tsconfig.json src/scripts/example-data.ts clear",
+    "vercel-build": "tsx src/db/migrate.ts && tsx --tsconfig tsconfig.json src/scripts/example-data.ts auto && next build"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",

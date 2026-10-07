@@ -156,10 +156,20 @@ export async function loadExampleData() {
   return { deals: 15 };
 }
 
+// "auto" is for the online test version's build: loads the example company only when
+// EXAMPLE_DATA=1 and the database is still empty, otherwise does nothing.
+async function auto() {
+  if (process.env.EXAMPLE_DATA !== "1") return "EXAMPLE_DATA isn't 1, so no example data.";
+  if (!(await isEmpty())) return "The database already has data, so it was left alone.";
+  await loadExampleData();
+  return "Example data loaded.";
+}
+
 if (process.argv[1]?.endsWith("example-data.ts")) {
-  const run = process.argv[2] === "clear" ? clearExampleData() : loadExampleData();
+  const mode = process.argv[2];
+  const run = mode === "clear" ? clearExampleData().then(() => "Example data cleared.") : mode === "auto" ? auto() : loadExampleData().then(() => "Example data loaded. Sign in as any example person.");
   run
-    .then(() => console.log(process.argv[2] === "clear" ? "Example data cleared." : "Example data loaded. Sign in as any example person."))
+    .then((message) => console.log(message))
     .catch((e) => {
       console.error(e.message);
       process.exitCode = 1;
