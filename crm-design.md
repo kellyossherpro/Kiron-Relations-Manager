@@ -6,6 +6,7 @@
 
 Newest first. When a decision here contradicts a section below, the decision wins until that section is rewritten.
 
+- **2026-10-07 — HubSpot renews for a full year on 30 December 2026.** Replacing it in 12 weeks is too risky. Plan: (1) ask HubSpot for a 6-month or monthly term; if agreed, switch in April 2027. (2) Otherwise renew one last year with the fewest seats, switch by June 2027, give notice, HubSpot ends 30 December 2027. Savings: ~$13,800/year from 2028; ~$27,000 over 2027–2029 on the conservative path. Business case deck: https://claude.ai/artifact/EGVz8tf1ngU2p9K4w33L2a
 - **2026-10-07 — Blueprint round 3.**
   - Pipeline source of truth confirmed: the sales playbook / HubSpot Deal Process doc. `sales_pipeline_process.docx` is retired.
   - Owners can still move their own deals to On Hold / Closed Lost / Terminated via the reason fields; only admins move between normal stages.
