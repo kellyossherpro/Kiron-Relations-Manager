@@ -6,6 +6,17 @@
 
 Newest first. When a decision here contradicts a section below, the decision wins until that section is rewritten.
 
+- **2026-10-07 — Blueprint round 2.**
+  - **Timeline:** renew HubSpot once on 31 Dec 2026 (fewest seats allowed), switch over before the June 2027 renewal. Contract notice period still to confirm.
+  - **Pipeline source of truth:** the sales playbook (`kiron-sales-playbook`) matches live HubSpot; `sales_pipeline_process.docx` is out of date (pending Kelly's confirmation, Q39). Stages: Lead → Customer Engagement → Qualified Lead → Feasibility (RICE, custom only) → Proposal → Legal & Compliance (direct only) → Closed Won → Live Direct / Live via Aggregator, plus Addendum loop for live clients, and On Hold / Closed Lost / Terminated.
+  - **Workflows:** 28 active HubSpot workflows collapse into ~8 CRM rules (stage engine, 60-day On Hold, 30/60-day stagnation emails, reason-driven exception moves, addendum loop, RICE link + MRR-from-tier field rules, marketing reminder). No lead assignment or renewal workflows exist.
+  - **Asana is a core integration**, not optional: L&C creates Legal and Compliance tasks whose completion fills deal properties; addendums create AM Mission Control tasks and return the deal to Live on completion.
+  - **Games** = the Product (Event Type) list, maintained by Kelly; adding games to a live client is a New Product addendum.
+  - **On Hold exit:** admin only; the deal page suggests the stage the deal qualifies for.
+  - **Support page** replaces Smartsheet with 18 named fields (see page). **Reports** at launch: activity per person and deal status / missing info; email counts arrive with Outlook logging, which may move before cutover.
+  - **Mobile:** quick entry on the move (contact, deal, note, call, meeting), not just lookups.
+  - **Microsoft 365:** Thabiso (IT) and Darren approve sign-in and email setup.
+  - **New open items:** quotes vs proposals (Q44), Asana wiring today (Q43), tier→MRR table and RICE link format (Q42), On Hold→Lost rule (Q41), possible HubSpot workflow 4 bug (Q40), owners' exception moves (Q45), Outlook email logging before cutover (Q38).
 - **2026-10-07 — Blueprint round 1 (from the live questions page).** Full answers live on the page; this is the summary.
   - **Guiding principle (Kelly):** it must be idiot-proof and as simple as possible. Every screen does one job; regular users never see settings.
   - **Records:** company identified by legal entity name; Company Type (Retail / Online / Both) makes the website required for Online and Both, optional for Retail; NoWebsite.com retired. Companies can have a parent; deals record the aggregator they came through. A contact needs a name plus an email or phone; email unique when present (Qualified Lead still needs both). Kelly adds fields and dropdown options herself in an admin screen. Several rate lines per deal (type, amount, currency); reports in USD at a monthly rate.
