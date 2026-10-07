@@ -7,7 +7,7 @@ config();
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 export default defineConfig({
-  resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+  resolve: { alias: { "@": path.resolve(__dirname, "src"), "server-only": path.resolve(__dirname, "src/test/server-only-stub.ts") } },
   test: {
     globalSetup: ["./src/test/global-setup.ts"],
     fileParallelism: false,

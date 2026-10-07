@@ -13,4 +13,4 @@ In-house CRM to replace HubSpot, built as a standalone app (decision 2026-10-07 
 
 ## Status
 
-In design (blueprint stage). No code yet. Kelly explains, Claude codes; standalone app.
+Building (Phase A, foundation). The app is in `crm/` (see `crm/README.md`). Kelly explains, Claude codes; standalone app.

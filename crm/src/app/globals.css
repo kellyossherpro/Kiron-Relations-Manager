@@ -1,26 +1,76 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Kiron brand (CI guide): green #5DCF11, white, dark #181923, black. Open Sauce One. */
+@theme {
+  --color-ink: #181923;
+  --color-black: #000000;
+  --color-brand: #5dcf11;
+  --color-brand-dark: #2f6b00;
+  --color-brand-soft: #eaf8de;
+  --color-paper: #f4f4f4;
+  --color-line: #e2e3e6;
+  --color-muted: #555661;
+  --color-warn: #9a5b00;
+  --color-warn-soft: #fdf1dc;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  --font-sans: "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-dark);
+  outline-offset: 2px;
+}
+
+/* Small shared building blocks so screens stay consistent (Tailwind v4 custom utilities). */
+@utility card {
+    @apply rounded-xl border border-line bg-white;
+  }
+
+@utility btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+@utility btn-primary {
+    @apply btn bg-brand text-ink hover:bg-[#52bb0e];
+  }
+
+@utility btn-dark {
+    @apply btn bg-ink text-white hover:bg-black;
+  }
+
+@utility btn-ghost {
+    @apply btn border border-line bg-white text-ink hover:border-ink;
+  }
+
+@utility btn-danger {
+    @apply btn border border-danger/40 bg-white text-danger hover:bg-danger-soft;
+  }
+
+@utility input {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:border-ink focus:outline-none;
+  }
+
+@utility label {
+    @apply mb-1 block text-xs font-bold tracking-wide text-muted uppercase;
+  }
+
+@utility h1 {
+    @apply text-2xl font-black tracking-tight text-ink uppercase;
+  }
+
+@utility h2 {
+    @apply text-sm font-black tracking-wider text-ink uppercase;
+  }
+
+@utility pill {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap;
+  }
+

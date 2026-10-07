@@ -145,3 +145,12 @@ export function sameValue(a: unknown, b: unknown): boolean {
   if (na !== null && nb !== null && !Number.isNaN(Number(na)) && !Number.isNaN(Number(nb))) return Number(na) === Number(nb);
   return false;
 }
+
+// Reads a field's current value from a database row (snake_case columns + properties).
+export function readFieldValue(row: Record<string, unknown> & { properties?: Record<string, unknown> }, spec: FieldSpec): unknown {
+  if (spec.column) {
+    const v = row[spec.column];
+    return v instanceof Date ? v.toISOString() : (v ?? null);
+  }
+  return row.properties?.[spec.key.slice(PROP_PREFIX.length)] ?? null;
+}

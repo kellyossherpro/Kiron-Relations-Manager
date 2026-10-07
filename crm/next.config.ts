@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 // model rather than Cache Components. Keep it simple.
 const nextConfig: NextConfig = {
   cacheComponents: false,
+  devIndicators: false,
   turbopack: {
     rules: {
       "*.css": {

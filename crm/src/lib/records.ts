@@ -2,7 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import type { ObjectType } from "@/db/schema";
 import { NotFoundError, PermissionError, RuleError, translateDbError } from "./errors";
-import { FieldError, fieldsFor, normalizeValue, PROP_PREFIX, sameValue, type FieldSpec } from "./fields";
+import { FieldError, fieldsFor, normalizeValue, PROP_PREFIX, readFieldValue, sameValue, type FieldSpec } from "./fields";
 import { canCreate, canDelete, canEditField, canMoveStage, OWNER_EXCEPTION_STAGES, type Actor } from "./permissions";
 
 export const TABLES: Record<ObjectType, string> = { company: "companies", contact: "contacts", deal: "deals" };
@@ -33,13 +33,7 @@ export async function collaboratorIds(tx: Tx | typeof db, dealId: string): Promi
   return res.rows.map((r) => r.user_id as string);
 }
 
-export function readField(row: Row, spec: FieldSpec): unknown {
-  if (spec.column) {
-    const v = row[spec.column];
-    return v instanceof Date ? v.toISOString() : v;
-  }
-  return row.properties?.[spec.key.slice(PROP_PREFIX.length)] ?? null;
-}
+export const readField = readFieldValue;
 
 async function audit(tx: Tx, actor: Actor | null, objectType: string, objectId: string, action: string, field: string | null, oldValue: unknown, newValue: unknown) {
   await tx.execute(sql`
