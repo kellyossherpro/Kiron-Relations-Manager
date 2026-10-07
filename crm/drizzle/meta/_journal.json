@@ -15,6 +15,20 @@
       "when": 1791381657089,
       "tag": "0001_pipeline_stages",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791384922187,
+      "tag": "0002_stage_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791384923370,
+      "tag": "0003_default_transitions",
+      "breakpoints": true
     }
   ]
 }

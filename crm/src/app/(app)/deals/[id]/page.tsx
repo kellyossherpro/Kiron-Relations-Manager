@@ -12,6 +12,7 @@ import { DEAL_CONTACT_ROLE_LABEL, plural } from "@/lib/format";
 import { canDelete, canEditRecord, canLogActivity, canMoveStage, isManager } from "@/lib/permissions";
 import { companyOptions, contactOptions, dealDaysInStage, getDealLinks, getRecord, listActivities, listHistory, listStages, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
+import { evaluateDeal } from "@/lib/stage-engine";
 import { clientFields } from "@/lib/view";
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +26,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     throw e;
   }
   const { row, specs, values } = record;
-  const [links, stages, users, companies, contacts, activities, history, daysInStage] = await Promise.all([
+  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation] = await Promise.all([
     getDealLinks(id),
     listStages(),
     listUsers(),
@@ -34,6 +35,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     listActivities({ dealId: id }),
     listHistory("deal", id),
     dealDaysInStage(id),
+    evaluateDeal(id),
   ]);
   const collabIds = links.collaborators.map((c) => c.id);
   const ownerId = row.owner_id;
@@ -59,7 +61,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">
-          <StageMover dealId={id} current={String(row.stage_key)} stages={stages} allowed={allowedStages} />
+          <StageMover dealId={id} current={String(row.stage_key)} stages={stages} allowed={allowedStages} checklist={evaluation?.requirements ?? []} nextLabel={evaluation?.next?.label ?? null} />
           <RecordFields objectType="deal" recordId={id} fields={clientFields(actor, "deal", ownerId, specs, collabIds)} values={values} lookups={lookups} />
           <ActivityPanel parent={{ dealId: id }} items={activities} users={userOptions} me={{ id: actor.id, isAdmin: isManager(actor) }} canLog={canLogActivity(actor)} />
         </div>

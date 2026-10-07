@@ -225,3 +225,62 @@ export const auditLog = pgTable(
   },
   (t) => [index("audit_object_idx").on(t.objectType, t.objectId, t.at)],
 );
+
+// ---------- stage rules ----------
+
+// What a deal needs before it can leave a stage. `kind`:
+// - field: the field (built-in key or "p.<key>") must be filled in
+// - has_contact: at least one contact on the deal (optionally with a given role)
+// - has_primary_company: the contracting company is set
+// - has_collaborator: at least one collaborator
+// A requirement can apply only when another field has a given value ("when").
+export const REQUIREMENT_KINDS = ["field", "has_contact", "has_primary_company", "has_collaborator"] as const;
+export type RequirementKind = (typeof REQUIREMENT_KINDS)[number];
+
+export const stageRequirements = pgTable(
+  "stage_requirements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stageKey: text("stage_key").notNull().references(() => pipelineStages.key),
+    kind: text("kind").$type<RequirementKind>().notNull(),
+    fieldKey: text("field_key"),
+    contactRole: text("contact_role"),
+    whenField: text("when_field"),
+    whenValue: text("when_value"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("stage_requirements_stage_idx").on(t.stageKey)],
+);
+
+// Where a deal goes when its stage is complete. Checked in order; the first whose
+// condition matches wins. No condition = always.
+export const stageTransitions = pgTable(
+  "stage_transitions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fromStage: text("from_stage").notNull().references(() => pipelineStages.key),
+    toStage: text("to_stage").notNull().references(() => pipelineStages.key),
+    whenField: text("when_field"),
+    whenValue: text("when_value"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("stage_transitions_from_idx").on(t.fromStage)],
+);
+
+// The in-CRM notification board: one row per person per alert.
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    kind: text("kind").notNull(), // stage_auto, stage_stale, on_hold_auto, closed_lost_auto
+    dealId: uuid("deal_id").references(() => deals.id),
+    stageKey: text("stage_key"),
+    message: text("message").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [index("notifications_user_idx").on(t.userId, t.readAt), index("notifications_deal_idx").on(t.dealId, t.kind)],
+);

@@ -3,9 +3,11 @@ import { signOutAction } from "@/app/actions";
 import { NavLink } from "@/components/nav-link";
 import { ROLE_LABEL } from "@/lib/format";
 import { requireActor } from "@/lib/session";
+import { unreadCount } from "@/lib/stage-rules-admin";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireActor();
+  const unread = await unreadCount(actor.id);
   return (
     <div className="min-h-screen lg:flex">
       <aside className="bg-black lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col">
@@ -20,6 +22,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLink href="/companies">Companies</NavLink>
           <NavLink href="/contacts">Contacts</NavLink>
           <NavLink href="/tasks">My tasks</NavLink>
+          <NavLink href="/notifications">
+            Notifications
+            {unread > 0 && <span className="ml-auto rounded-full bg-white px-2 text-xs text-ink tabular-nums" aria-label={`${unread} unread`}>{unread}</span>}
+          </NavLink>
           {actor.role === "admin" && <NavLink href="/admin">Admin</NavLink>}
         </nav>
         <div className="hidden border-t border-white/10 px-5 py-4 lg:block">

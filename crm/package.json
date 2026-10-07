@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "e2e": "node e2e/walkthrough.mjs"
+    "e2e": "node e2e/walkthrough.mjs",
+    "rules:daily": "tsx --tsconfig tsconfig.json src/scripts/daily-rules.ts",
+    "e2e:rules": "node e2e/stage-rules.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",

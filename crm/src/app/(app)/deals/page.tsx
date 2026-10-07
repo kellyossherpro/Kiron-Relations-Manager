@@ -3,6 +3,7 @@ import { money, plural } from "@/lib/format";
 import { canCreate } from "@/lib/permissions";
 import { listDeals, listStages, type DealCard } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
+import { missingByDeal } from "@/lib/stage-engine";
 
 export const metadata = { title: "Deals" };
 
@@ -11,7 +12,7 @@ const OUT_OF_PIPELINE = ["parked", "lost", "terminated"];
 export default async function DealsPage({ searchParams }: { searchParams: Promise<{ view?: string; who?: string }> }) {
   const actor = await requireActor();
   const { view = "board", who = "mine" } = await searchParams;
-  const [stages, deals] = await Promise.all([listStages(), listDeals(who === "all" ? {} : { ownerId: actor.id })]);
+  const [stages, deals, missing] = await Promise.all([listStages(), listDeals(who === "all" ? {} : { ownerId: actor.id }), missingByDeal()]);
   const active = stages.filter((s) => !OUT_OF_PIPELINE.includes(s.kind));
   const parked = stages.filter((s) => OUT_OF_PIPELINE.includes(s.kind));
   const byStage = (key: string) => deals.filter((d) => d.stageKey === key);
@@ -41,7 +42,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           {canCreate(actor) && <Link href="/deals/new" className="btn-primary mt-4">Add the first deal</Link>}
         </div>
       ) : view === "list" ? (
-        <DealTable deals={deals} stageLabel={(k) => stages.find((s) => s.key === k)?.label ?? k} />
+        <DealTable deals={deals} missing={missing} stageLabel={(k) => stages.find((s) => s.key === k)?.label ?? k} />
       ) : (
         <>
           <div className="-mx-4 overflow-x-auto px-4 pb-2 lg:-mx-8 lg:px-8">
@@ -55,7 +56,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                       <span className="text-xs font-bold text-muted tabular-nums">{list.length}</span>
                     </header>
                     <ul className="space-y-2">
-                      {list.map((d) => <DealCardView key={d.id} d={d} />)}
+                      {list.map((d) => <DealCardView key={d.id} d={d} missing={missing[d.id]} />)}
                     </ul>
                   </section>
                 );
@@ -65,7 +66,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           {parked.some((s) => byStage(s.key).length) && (
             <section className="card p-5">
               <h2 className="h2 mb-3">Out of the pipeline</h2>
-              <DealTable deals={deals.filter((d) => parked.some((s) => s.key === d.stageKey))} stageLabel={(k) => stages.find((s) => s.key === k)?.label ?? k} />
+              <DealTable deals={deals.filter((d) => parked.some((s) => s.key === d.stageKey))} missing={missing} stageLabel={(k) => stages.find((s) => s.key === k)?.label ?? k} />
             </section>
           )}
         </>
@@ -74,7 +75,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   );
 }
 
-function DealCardView({ d }: { d: DealCard }) {
+function DealCardView({ d, missing }: { d: DealCard; missing?: { missing: number; total: number } }) {
   return (
     <li>
       <Link href={`/deals/${d.id}`} className="card block p-3 transition-colors hover:border-ink">
@@ -85,17 +86,18 @@ function DealCardView({ d }: { d: DealCard }) {
           <span className={d.daysInStage >= 30 ? "font-bold text-warn" : "text-muted"}>{plural(d.daysInStage, "day")} in stage</span>
         </div>
         {d.ownerName && <p className="mt-1 text-xs text-muted">{d.ownerName}</p>}
+        {missing && missing.missing > 0 && <p className="pill mt-2 bg-warn-soft text-warn">{missing.missing} of {missing.total} still needed</p>}
       </Link>
     </li>
   );
 }
 
-function DealTable({ deals, stageLabel }: { deals: DealCard[]; stageLabel: (k: string) => string }) {
+function DealTable({ deals, stageLabel, missing }: { deals: DealCard[]; stageLabel: (k: string) => string; missing: Record<string, { missing: number; total: number }> }) {
   return (
     <div className="card overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="border-b border-line text-left text-xs tracking-wide text-muted uppercase">
-          <tr><th className="p-3">Deal</th><th className="p-3">Company</th><th className="p-3">Stage</th><th className="p-3 text-right">Monthly</th><th className="p-3">Owner</th><th className="p-3 text-right">Days in stage</th></tr>
+          <tr><th className="p-3">Deal</th><th className="p-3">Company</th><th className="p-3">Stage</th><th className="p-3">Still needed</th><th className="p-3 text-right">Monthly</th><th className="p-3">Owner</th><th className="p-3 text-right">Days in stage</th></tr>
         </thead>
         <tbody>
           {deals.map((d) => (
@@ -103,6 +105,7 @@ function DealTable({ deals, stageLabel }: { deals: DealCard[]; stageLabel: (k: s
               <td className="p-3 font-bold"><Link href={`/deals/${d.id}`} className="hover:underline">{d.name}</Link></td>
               <td className="p-3">{d.companyName ?? "—"}</td>
               <td className="p-3">{stageLabel(d.stageKey)}</td>
+              <td className={`p-3 ${missing[d.id]?.missing ? "font-bold text-warn" : "text-muted"}`}>{missing[d.id] ? (missing[d.id].missing ? `${missing[d.id].missing} of ${missing[d.id].total}` : "Nothing") : "—"}</td>
               <td className="p-3 text-right tabular-nums">{money(d.amountMonthly)}</td>
               <td className="p-3">{d.ownerName ?? "—"}</td>
               <td className={`p-3 text-right tabular-nums ${d.daysInStage >= 30 ? "font-bold text-warn" : ""}`}>{d.daysInStage}</td>

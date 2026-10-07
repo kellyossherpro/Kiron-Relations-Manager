@@ -4,13 +4,14 @@ import type { ObjectType } from "@/db/schema";
 import { NotFoundError, PermissionError, RuleError, translateDbError } from "./errors";
 import { FieldError, fieldsFor, normalizeValue, PROP_PREFIX, readFieldValue, sameValue, type FieldSpec } from "./fields";
 import { canCreate, canDelete, canEditField, canMoveStage, OWNER_EXCEPTION_STAGES, type Actor } from "./permissions";
+import { autoAdvance } from "./stage-engine";
 
 export const TABLES: Record<ObjectType, string> = { company: "companies", contact: "contacts", deal: "deals" };
 
 export type Row = Record<string, unknown> & { id: string; owner_id: string | null; version: number; properties: Record<string, unknown> };
 
 export type Conflict = { field: string; label: string; yours: unknown; theirs: unknown; original: unknown };
-export type SaveResult = { status: "saved"; version: number } | { status: "conflict"; conflicts: Conflict[]; version: number };
+export type SaveResult = { status: "saved"; version: number; movedTo?: string[] } | { status: "conflict"; conflicts: Conflict[]; version: number };
 
 // ---------- helpers ----------
 
@@ -92,6 +93,7 @@ export async function createRecord(actor: Actor, objectType: ObjectType, values:
       returning id`);
     const id = res.rows[0].id as string;
     await audit(tx, actor, objectType, id, "create", null, null, snapshot);
+    if (objectType === "deal") await autoAdvance(tx, id);
     return id;
   });
 }
@@ -159,7 +161,10 @@ export async function updateRecord(
       set ${setClause(assignments)}, version = version + 1, updated_at = now()
       where id = ${id} returning version`);
     for (const w of writes) await audit(tx, actor, objectType, id, "update", w.spec.key, w.oldValue, w.newValue);
-    return { status: "saved", version: res.rows[0].version as number };
+    // Same transaction and row lock: if this save completed the stage, the deal moves exactly once.
+    const movedTo = objectType === "deal" ? await autoAdvance(tx, id) : [];
+    const version = movedTo.length ? ((await tx.execute(sql`select version from deals where id = ${id}`)).rows[0].version as number) : (res.rows[0].version as number);
+    return { status: "saved", version, movedTo };
   });
 }
 

@@ -40,7 +40,7 @@ export function RecordFields({
   const [base, setBase] = useState<Record<string, unknown>>(values);
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [error, setError] = useState<{ message: string; field?: string } | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const canEdit = fields.some((f) => f.editable);
@@ -60,7 +60,7 @@ export function RecordFields({
     setBase(values);
     setConflicts([]);
     setError(null);
-    setSaved(false);
+    setSaved(null);
     setEditing(true);
   }
 
@@ -84,7 +84,7 @@ export function RecordFields({
       if (res.status === "saved") {
         setEditing(false);
         setConflicts([]);
-        setSaved(true);
+        setSaved(res.movedTo?.length ? "Saved. Everything needed for this stage is filled in, so the deal moved on." : "Saved");
         router.refresh();
       } else if (res.status === "conflict") {
         setConflicts(res.conflicts);
@@ -111,7 +111,7 @@ export function RecordFields({
         {!editing && canEdit && (
           <button className="btn-ghost" onClick={beginEdit}>Edit</button>
         )}
-        {!editing && saved && <span className="text-xs font-bold text-brand-dark" role="status">Saved</span>}
+        {!editing && saved && <span className="text-xs font-bold text-brand-dark" role="status">{saved}</span>}
       </div>
 
       {conflicts.length > 0 && (

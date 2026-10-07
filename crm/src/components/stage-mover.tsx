@@ -8,7 +8,7 @@ type Stage = { key: string; label: string; kind: string };
 
 // Shows where the deal is in the pipeline. Managers can move it anywhere; owners
 // can park or close it. Every manual move needs a reason, which goes in the history.
-export function StageMover({ dealId, current, stages, allowed }: { dealId: string; current: string; stages: Stage[]; allowed: string[] }) {
+export function StageMover({ dealId, current, stages, allowed, checklist, nextLabel }: { dealId: string; current: string; stages: Stage[]; allowed: string[]; checklist: { id: string; label: string; met: boolean }[]; nextLabel: string | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState("");
@@ -56,6 +56,27 @@ export function StageMover({ dealId, current, stages, allowed }: { dealId: strin
           </li>
         ))}
       </ol>
+      <div className="mt-4">
+        {checklist.length === 0 ? (
+          <p className="text-sm text-muted">No rules for this stage yet, so the deal only moves when someone moves it.</p>
+        ) : (
+          <>
+            <p className="mb-2 text-sm font-bold">
+              {checklist.every((c) => c.met)
+                ? nextLabel ? `Everything is filled in.` : "Everything is filled in. There's no next stage set, so move it by hand."
+                : `Needed before it moves${nextLabel ? ` to ${nextLabel}` : " on"} (${checklist.filter((c) => !c.met).length} of ${checklist.length} left):`}
+            </p>
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {checklist.map((c) => (
+                <li key={c.id} className={`flex items-start gap-2 text-sm ${c.met ? "text-muted" : "font-semibold"}`}>
+                  <span aria-hidden className={`mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${c.met ? "bg-brand text-ink" : "border-2 border-warn"}`}>{c.met ? "✓" : ""}</span>
+                  <span>{c.label}<span className="sr-only">{c.met ? " (done)" : " (missing)"}</span></span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
       {currentIndex < 0 && currentStage && (
         <p className="mt-2 text-xs font-bold text-warn">This deal is out of the normal pipeline: {currentStage.label}.</p>
       )}

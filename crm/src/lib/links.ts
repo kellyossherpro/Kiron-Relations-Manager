@@ -4,6 +4,7 @@ import { DEAL_CONTACT_ROLES } from "@/db/schema";
 import { NotFoundError, PermissionError, RuleError, translateDbError } from "./errors";
 import { canEditRecord, isManager, type Actor } from "./permissions";
 import { collaboratorIds, lockRow } from "./records";
+import { autoAdvance } from "./stage-engine";
 
 async function audit(tx: Tx, actor: Actor, objectType: string, objectId: string, action: string, newValue: unknown) {
   await tx.execute(sql`
@@ -68,6 +69,7 @@ export async function addDealContact(actor: Actor, dealId: string, contactId: st
     await requireExists(tx, "contacts", contactId);
     await tx.execute(sql`insert into deal_contacts (deal_id, contact_id, role) values (${dealId}, ${contactId}, ${role}) on conflict do nothing`);
     await audit(tx, actor, "deal", dealId, "link", { contactId, role });
+    await autoAdvance(tx, dealId);
   });
 }
 
@@ -109,6 +111,7 @@ export async function addCollaborator(actor: Actor, dealId: string, userId: stri
     await requireExists(tx, "users", userId);
     await tx.execute(sql`insert into deal_collaborators (deal_id, user_id) values (${dealId}, ${userId}) on conflict do nothing`);
     await audit(tx, actor, "deal", dealId, "link", { collaboratorId: userId });
+    await autoAdvance(tx, dealId);
   });
 }
 

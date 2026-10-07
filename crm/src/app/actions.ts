@@ -19,6 +19,7 @@ import {
 } from "@/lib/links";
 import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord, type SaveResult } from "@/lib/records";
 import { requireActor, signInAs, signOut } from "@/lib/session";
+import { addRequirement, addTransition, markAllRead, removeRequirement, removeTransition, type RequirementInput } from "@/lib/stage-rules-admin";
 
 // Every action checks who is signed in, then calls the same tested functions the
 // tests use. Expected problems come back as a message for the screen.
@@ -238,4 +239,42 @@ export async function updateFieldAction(
   const res = await attempt(() => updateFieldDefinition(actor, id, input));
   refresh();
   return res;
+}
+
+// ---------- stage rules ----------
+
+export async function addRequirementAction(input: RequirementInput): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => addRequirement(actor, input));
+  refresh();
+  return res;
+}
+
+export async function removeRequirementAction(id: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => removeRequirement(actor, id));
+  refresh();
+  return res;
+}
+
+export async function addTransitionAction(input: { fromStage: string; toStage: string; whenField?: string | null; whenValue?: string | null }): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => addTransition(actor, input));
+  refresh();
+  return res;
+}
+
+export async function removeTransitionAction(id: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => removeTransition(actor, id));
+  refresh();
+  return res;
+}
+
+// ---------- notifications ----------
+
+export async function markAllReadAction() {
+  const actor = await requireActor();
+  await markAllRead(actor.id);
+  refresh();
 }
