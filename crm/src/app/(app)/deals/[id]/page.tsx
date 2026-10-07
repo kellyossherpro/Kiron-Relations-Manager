@@ -140,7 +140,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           <details className="card p-5">
             <summary className="h2 cursor-pointer">History</summary>
             <div className="mt-3">
-              <HistoryList entries={history} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={stageLabels} names={names} />
+              <HistoryList entries={history} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={stageLabels} names={names} moneyFields={specs.filter((s) => s.type === "money").map((s) => s.key)} />
             </div>
           </details>
         </div>

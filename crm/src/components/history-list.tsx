@@ -1,4 +1,4 @@
-import { dateTime } from "@/lib/format";
+import { dateTime, money } from "@/lib/format";
 
 type Entry = { id: number; action: string; field: string | null; oldValue: unknown; newValue: unknown; at: string; userName: string | null };
 
@@ -12,7 +12,8 @@ function show(v: unknown, names: Record<string, string> = {}) {
 }
 
 // Field labels come from the page, so renamed fields read correctly.
-export function HistoryList({ entries, labels, stageLabels, names = {} }: { entries: Entry[]; labels: Record<string, string>; stageLabels: Record<string, string>; names?: Record<string, string> }) {
+export function HistoryList({ entries, labels, stageLabels, names = {}, moneyFields = [] }: { entries: Entry[]; labels: Record<string, string>; stageLabels: Record<string, string>; names?: Record<string, string>; moneyFields?: string[] }) {
+  const value = (field: string | null, v: unknown) => (field && moneyFields.includes(field) && v !== null && v !== "" ? money(v) : show(v, names));
   if (entries.length === 0) return <p className="text-sm text-muted">No changes yet.</p>;
   return (
     <ol className="space-y-2 text-sm">
@@ -33,14 +34,15 @@ export function HistoryList({ entries, labels, stageLabels, names = {} }: { entr
         else
           text = (
             <>
-              Changed <strong>{labels[e.field ?? ""] ?? e.field}</strong> from <span className="text-muted">{show(e.oldValue, names)}</span> to <strong>{show(e.newValue, names)}</strong>
+              Changed <strong>{labels[e.field ?? ""] ?? e.field}</strong> from <span className="text-muted">{value(e.field, e.oldValue)}</span> to <strong>{value(e.field, e.newValue)}</strong>
             </>
           );
         return (
-          <li key={e.id} className="flex flex-wrap gap-x-2 border-b border-line pb-2 last:border-0">
-            <span className="w-32 shrink-0 text-xs text-muted tabular-nums">{dateTime(e.at)}</span>
-            <span className="w-32 shrink-0 text-xs font-bold">{e.userName ?? "System"}</span>
-            <span className="min-w-0 flex-1">{text}</span>
+          <li key={e.id} className="border-b border-line pb-2 last:border-0">
+            <p className="text-xs text-muted">
+              <span className="tabular-nums">{dateTime(e.at)}</span> · <span className="font-bold text-ink">{e.userName ?? "System"}</span>
+            </p>
+            <p className="mt-0.5 break-words">{text}</p>
           </li>
         );
       })}

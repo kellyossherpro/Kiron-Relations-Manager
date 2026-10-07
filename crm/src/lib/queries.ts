@@ -56,6 +56,7 @@ export type DealCard = {
   id: string;
   name: string;
   stageKey: string;
+  stageKind: string;
   amountMonthly: string | null;
   companyName: string | null;
   ownerName: string | null;
@@ -67,11 +68,12 @@ export type DealCard = {
 export async function listDeals(opts: { ownerId?: string; q?: string } = {}): Promise<DealCard[]> {
   const like = opts.q ? `%${opts.q}%` : null;
   const res = await db.execute(sql`
-    select d.id, d.name, d.stage_key as "stageKey", d.amount_monthly as "amountMonthly", c.name as "companyName",
+    select d.id, d.name, d.stage_key as "stageKey", s.kind as "stageKind", d.amount_monthly as "amountMonthly", c.name as "companyName",
            u.name as "ownerName", d.owner_id as "ownerId",
            floor(extract(epoch from now() - d.stage_entered_at) / 86400)::int as "daysInStage",
            d.updated_at as "updatedAt"
     from deals d
+    join pipeline_stages s on s.key = d.stage_key
     left join companies c on c.id = d.primary_company_id
     left join users u on u.id = d.owner_id
     where d.deleted_at is null

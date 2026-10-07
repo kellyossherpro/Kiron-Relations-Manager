@@ -25,6 +25,9 @@ npm run dev                   # http://localhost:3000 → "Set up KRM"
 | `npm run e2e` | Clicks through the app in a browser on an empty dev database and saves screenshots to `e2e/screenshots/` (example data only) |
 | `npm run e2e:rules` | Same, for the stage rules (needs `CRON_SECRET` in the environment) |
 | `npm run e2e:addendum` | Same, for the addendum loop |
+| `npm run example:load` | Fills an **empty** database with a made-up example company (people, deals, rules) for demos. Refuses if there's any data |
+| `npm run example:clear` | Empties it again. Refuses if anyone in it isn't an `@example.test` person |
+| `node e2e/tour.mjs` | With example data loaded and the app running: takes the screenshots for the KRM tour |
 | `npm run rules:daily` | Runs the daily rules by hand (30-day reminders, 60-day On Hold, 60 days On Hold → Closed Lost) |
 
 ## How it's built

@@ -100,9 +100,11 @@ describe("the addendum loop", () => {
     const id = await liveDeal(owner);
     await addCollaborator(owner, id, collaborator.id);
 
-    for (const who of [otherSales, anyAm, legal, viewer]) {
+    for (const who of [otherSales, legal, viewer]) {
       await expect(raiseAddendum(who, id, { type: "commercial", details: "x" })).rejects.toThrow(PermissionError);
     }
+    // The AM team looks after live clients, so any account manager can raise one.
+    await cancelAddendum(anyAm, await raiseAddendum(anyAm, id, { type: "commercial", details: "x" }), "testing");
     const a = await raiseAddendum(collaborator, id, { type: "commercial", details: "x" });
     for (const who of [otherSales, legal, viewer]) await expect(finishAddendum(who, a)).rejects.toThrow(PermissionError);
     await finishAddendum(anyAm, a); // the AM team actions addendums on anyone's deals

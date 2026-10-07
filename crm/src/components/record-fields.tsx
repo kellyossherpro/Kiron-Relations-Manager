@@ -108,10 +108,12 @@ export function RecordFields({
     <section className="card p-5" aria-label="Details">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="h2">Details</h2>
-        {!editing && canEdit && (
-          <button className="btn-ghost" onClick={beginEdit}>Edit</button>
-        )}
-        {!editing && saved && <span className="text-xs font-bold text-brand-dark" role="status">{saved}</span>}
+        <div className="flex items-center gap-3">
+          {!editing && saved && <span className="text-right text-xs font-bold text-brand-dark" role="status">{saved}</span>}
+          {!editing && canEdit && (
+            <button className="btn-ghost shrink-0" onClick={beginEdit}>Edit</button>
+          )}
+        </div>
       </div>
 
       {conflicts.length > 0 && (

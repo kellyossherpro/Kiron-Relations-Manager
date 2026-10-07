@@ -58,7 +58,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
                       <p className="text-xs text-muted">{[c.role, c.isCurrent ? "Current" : "Past"].filter(Boolean).join(" · ")}</p>
                     </div>
                     {canEdit && (c.isCurrent
-                      ? <UnlinkButton kind="companyContactPast" a={c.id} b={id} label="Left" />
+                      ? <UnlinkButton kind="companyContactPast" a={c.id} b={id} label="Mark as left" />
                       : <UnlinkButton kind="companyContactCurrent" a={c.id} b={id} label="Back" />)}
                   </li>
                 ))}
@@ -82,7 +82,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           <details className="card p-5">
             <summary className="h2 cursor-pointer">History</summary>
             <div className="mt-3">
-              <HistoryList entries={history} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={Object.fromEntries(stages.map((s) => [s.key, s.label]))} names={names} />
+              <HistoryList entries={history} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={Object.fromEntries(stages.map((s) => [s.key, s.label]))} names={names} moneyFields={specs.filter((s) => s.type === "money").map((s) => s.key)} />
             </div>
           </details>
         </div>

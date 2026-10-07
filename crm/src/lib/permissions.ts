@@ -53,10 +53,11 @@ export function canManageUsersAndFields(actor: Actor) {
   return actor.role === "admin";
 }
 
-// Addendums: whoever can edit a live deal raises one. Finishing or cancelling it is
-// done by the account management team (any account manager) or anyone who can edit the deal.
+// Addendums: live clients are looked after by the account management team, so any
+// account manager can raise, finish or cancel one on any live deal, as can anyone who
+// can edit the deal (its owner, collaborators, managers).
 export function canRaiseAddendum(actor: Actor, record: { ownerId: string | null }, opts: { collaboratorIds?: string[] } = {}) {
-  return canEditRecord(actor, record, opts);
+  return actor.role === "account_manager" || canEditRecord(actor, record, opts);
 }
 
 export function canFinishAddendum(actor: Actor, record: { ownerId: string | null }, opts: { collaboratorIds?: string[] } = {}) {

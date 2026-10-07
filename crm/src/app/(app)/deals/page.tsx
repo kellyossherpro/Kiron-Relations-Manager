@@ -9,6 +9,9 @@ export const metadata = { title: "Deals" };
 
 const OUT_OF_PIPELINE = ["parked", "lost", "terminated"];
 
+// Highlight deals the 30/60-day rules apply to (still being sold) once they've sat for 30 days.
+const looksStuck = (d: DealCard) => ["open", "won"].includes(d.stageKind) && d.daysInStage >= 30;
+
 export default async function DealsPage({ searchParams }: { searchParams: Promise<{ view?: string; who?: string }> }) {
   const actor = await requireActor();
   const { view = "board", who = "mine" } = await searchParams;
@@ -83,7 +86,7 @@ function DealCardView({ d, missing }: { d: DealCard; missing?: { missing: number
         {d.companyName && <p className="text-xs text-muted">{d.companyName}</p>}
         <div className="mt-2 flex items-center justify-between text-xs">
           <span className="font-bold">{money(d.amountMonthly)}{d.amountMonthly ? "/mo" : ""}</span>
-          <span className={d.daysInStage >= 30 ? "font-bold text-warn" : "text-muted"}>{plural(d.daysInStage, "day")} in stage</span>
+          <span className={looksStuck(d) ? "font-bold text-warn" : "text-muted"}>{plural(d.daysInStage, "day")} in stage</span>
         </div>
         {d.ownerName && <p className="mt-1 text-xs text-muted">{d.ownerName}</p>}
         {missing && missing.missing > 0 && <p className="pill mt-2 bg-warn-soft text-warn">{missing.missing} of {missing.total} still needed</p>}
@@ -108,7 +111,7 @@ function DealTable({ deals, stageLabel, missing }: { deals: DealCard[]; stageLab
               <td className={`p-3 ${missing[d.id]?.missing ? "font-bold text-warn" : "text-muted"}`}>{missing[d.id] ? (missing[d.id].missing ? `${missing[d.id].missing} of ${missing[d.id].total}` : "Nothing") : "—"}</td>
               <td className="p-3 text-right tabular-nums">{money(d.amountMonthly)}</td>
               <td className="p-3">{d.ownerName ?? "—"}</td>
-              <td className={`p-3 text-right tabular-nums ${d.daysInStage >= 30 ? "font-bold text-warn" : ""}`}>{d.daysInStage}</td>
+              <td className={`p-3 text-right tabular-nums ${looksStuck(d) ? "font-bold text-warn" : ""}`}>{d.daysInStage}</td>
             </tr>
           ))}
         </tbody>

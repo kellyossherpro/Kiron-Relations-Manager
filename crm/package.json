@@ -14,7 +14,9 @@
     "e2e": "node e2e/walkthrough.mjs",
     "rules:daily": "tsx --tsconfig tsconfig.json src/scripts/daily-rules.ts",
     "e2e:rules": "node e2e/stage-rules.mjs",
-    "e2e:addendum": "node e2e/addendum.mjs"
+    "e2e:addendum": "node e2e/addendum.mjs",
+    "example:load": "tsx --tsconfig tsconfig.json src/scripts/example-data.ts",
+    "example:clear": "tsx --tsconfig tsconfig.json src/scripts/example-data.ts clear"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",

@@ -42,7 +42,7 @@ export async function raiseAddendum(actor: Actor, dealId: string, input: { type:
   return withTx(async (tx) => {
     const row = await lockRow(tx, "deal", dealId);
     if (!canRaiseAddendum(actor, { ownerId: row.owner_id }, { collaboratorIds: await collaboratorIds(tx, dealId) })) {
-      throw new PermissionError("Only the deal's owner, a collaborator or a manager can raise an addendum.");
+      throw new PermissionError("Only an account manager, the deal's owner, a collaborator or a manager can raise an addendum.");
     }
     const current = await tx.execute(sql`select label, kind from pipeline_stages where key = ${row.stage_key as string}`);
     if (current.rows[0]?.kind === "change") throw new RuleError("This deal already has an addendum in progress. Finish or cancel it first.");
