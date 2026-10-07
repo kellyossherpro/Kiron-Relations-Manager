@@ -4,6 +4,8 @@ In-house CRM to replace HubSpot, built as a standalone app (decision 2026-10-07 
 
 ## Documents
 
+- **Blueprint questions (live page):** https://claude.ai/artifact/9PQyT2yfhPTMQktv1rsphb — Kelly answers there; Claude reads the answers, replies and records decisions. Decisions are copied into `crm-design.md`.
+
 - **crm-design.md** — design notes: the why, the shape, the architecture.
 - **crm-questions-for-patrick.md** — *superseded* (portal plan dropped); kept for reference.
 - **crm-definition-of-done.md** — checklist that triggers cutover from HubSpot.
