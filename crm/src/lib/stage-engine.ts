@@ -3,6 +3,7 @@ import { db, type Tx } from "@/db";
 import type { RequirementKind } from "@/db/schema";
 import { valueMatches } from "./conditions";
 import { fieldsFor, readFieldValue, type FieldSpec } from "./fields";
+import { goLiveChecks, goLiveMissing } from "./go-live-checks";
 
 export { valueMatches };
 import { DEAL_CONTACT_ROLE_LABEL } from "./format";
@@ -41,9 +42,10 @@ export type DealSnapshot = {
   hasPrimaryCompany: boolean;
   collaboratorCount: number;
   companyValues?: Record<string, unknown>; // the contracting company's fields
+  goLiveMissing?: string[]; // go-live handovers not confirmed yet ("Finance", "Dev")
 };
 
-export type CheckedRequirement = { id: string; label: string; met: boolean };
+export type CheckedRequirement = { id: string; label: string; met: boolean; kind?: RequirementKind };
 export type Evaluation = {
   stage: Stage | undefined;
   requirements: CheckedRequirement[];
@@ -72,6 +74,7 @@ export function requirementLabel(cfg: PipelineConfig, r: Requirement) {
   }
   else if (r.kind === "has_contact") base = r.contactRole ? `${DEAL_CONTACT_ROLE_LABEL[r.contactRole] ?? r.contactRole} contact added` : "A contact added";
   else if (r.kind === "has_primary_company") base = "Contracting company set";
+  else if (r.kind === "go_live_confirmed") base = "Go-live confirmed by Legal, Finance, Support and Dev";
   else base = "A collaborator added";
   const cond = conditionText(cfg, r.whenField, r.whenValue);
   return cond ? `${base} (${cond})` : base;
@@ -101,8 +104,13 @@ export function evaluate(deal: DealSnapshot, cfg: PipelineConfig): Evaluation {
     }
     else if (r.kind === "has_contact") met = r.contactRole ? deal.contactRoles.includes(r.contactRole) : deal.contactRoles.length > 0;
     else if (r.kind === "has_primary_company") met = deal.hasPrimaryCompany;
+    else if (r.kind === "go_live_confirmed") {
+      const waiting = deal.goLiveMissing ?? ["Legal", "Finance", "Support", "Dev"];
+      met = waiting.length === 0;
+      if (!met) return { id: r.id, label: `${requirementLabel(cfg, r)} (waiting for ${waiting.join(", ")})`, met, kind: r.kind };
+    }
     else met = deal.collaboratorCount > 0;
-    return { id: r.id, label: requirementLabel(cfg, r), met };
+    return { id: r.id, label: requirementLabel(cfg, r), met, kind: r.kind };
   });
 
   const transition = cfg.transitions
@@ -156,7 +164,11 @@ export async function snapshotDeal(q: Q, row: Record<string, unknown>, cfg: Pipe
     q.execute(sql`select * from companies where id = ${(row.primary_company_id as string | null) ?? null} and deleted_at is null`),
   ]);
   const companyRow = company.rows[0];
+  const goLive = cfg.requirements.some((r) => r.kind === "go_live_confirmed")
+    ? (await goLiveMissing(q, [{ id, properties: row.properties as Record<string, unknown> }])).get(id)
+    : undefined;
   return {
+    goLiveMissing: goLive,
     companyValues: companyRow ? Object.fromEntries(cfg.companyFields.map((f) => [f.key, readFieldValue(companyRow as never, f)])) : {},
     stageKey: row.stage_key as string,
     values: Object.fromEntries(cfg.fields.map((f) => [f.key, readFieldValue(row as never, f)])),
@@ -184,6 +196,9 @@ export async function missingByDeal(): Promise<Record<string, { missing: number;
     db.execute(sql`select * from companies where deleted_at is null`),
   ]);
   const companyById = new Map(companies.rows.map((c) => [c.id as string, c]));
+  const goLive = cfg.requirements.some((r) => r.kind === "go_live_confirmed")
+    ? await goLiveMissing(db, deals.rows.map((d) => ({ id: d.id as string, properties: d.properties as Record<string, unknown> })))
+    : new Map<string, string[]>();
   const rolesBy = new Map<string, string[]>();
   for (const r of roles.rows) rolesBy.set(r.deal_id as string, [...(rolesBy.get(r.deal_id as string) ?? []), r.role as string]);
   const collabsBy = new Map(collabs.rows.map((r) => [r.deal_id as string, r.n as number]));
@@ -197,6 +212,7 @@ export async function missingByDeal(): Promise<Record<string, { missing: number;
         contactRoles: rolesBy.get(id) ?? [],
         hasPrimaryCompany: !!row.primary_company_id,
         collaboratorCount: collabsBy.get(id) ?? 0,
+        goLiveMissing: goLive.get(id),
         companyValues: (() => {
           const c = companyById.get(row.primary_company_id as string);
           return c ? Object.fromEntries(cfg.companyFields.map((f) => [f.key, readFieldValue(c as never, f)])) : {};
@@ -354,7 +370,37 @@ export async function autoAdvance(tx: Tx, dealId: string): Promise<string[]> {
     await moveAutomatically(tx, row, ev.next, `everything needed for ${ev.stage?.label ?? row.stage_key} is filled in`, "stage_auto", new Date());
     moved.push(ev.next.key);
   }
+  await askForGoLive(tx, dealId);
   return moved;
+}
+
+/**
+ * Once everything else for the won stage is in (Live date included), tells each department whose
+ * go-live handover is still open. Once per person per stage visit.
+ */
+export async function askForGoLive(tx: Tx, dealId: string) {
+  const cfg = await loadPipelineConfig(tx);
+  if (!cfg.requirements.some((r) => r.kind === "go_live_confirmed")) return;
+  const row = (await tx.execute(sql`select * from deals where id = ${dealId} and deleted_at is null`)).rows[0];
+  if (!row) return;
+  const ev = evaluate(await snapshotDeal(tx, row, cfg), cfg);
+  const goLive = ev.requirements.find((r) => r.kind === "go_live_confirmed");
+  if (!goLive || goLive.met || ev.requirements.some((r) => r.kind !== "go_live_confirmed" && !r.met)) return;
+  const checks = (await goLiveChecks(tx, [{ id: dealId, properties: row.properties as Record<string, unknown> }])).get(dealId) ?? [];
+  for (const c of checks.filter((x) => !x.confirmed && x.teamIds.length)) {
+    const people = await tx.execute(sql`
+      select distinct u.id from team_members m join users u on u.id = m.user_id
+      where m.team_id in (${sql.join(c.teamIds.map((t) => sql`${t}`), sql`, `)}) and u.active
+        and not exists (
+          select 1 from notifications n where n.user_id = u.id and n.deal_id = ${dealId} and n.kind = 'golive_needed'
+            and n.stage_key = ${row.stage_key as string} and n.created_at >= ${row.stage_entered_at as Date})`);
+    await notify(tx, people.rows.map((p) => p.id as string), {
+      kind: "golive_needed",
+      dealId,
+      stageKey: row.stage_key as string,
+      message: `"${row.name}" is ready to go live: please confirm the ${c.label} handover.`,
+    });
+  }
 }
 
 // ============================================================================

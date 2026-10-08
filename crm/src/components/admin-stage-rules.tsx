@@ -17,6 +17,7 @@ const WHAT: { value: RequirementKind; label: string }[] = [
   { value: "has_contact", label: "A contact is added" },
   { value: "has_primary_company", label: "The contracting company is set" },
   { value: "has_collaborator", label: "A collaborator is added" },
+  { value: "go_live_confirmed", label: "Legal, Finance, Support and Dev confirm go-live" },
 ];
 
 // Fields a condition can depend on: ones with a fixed set of answers.

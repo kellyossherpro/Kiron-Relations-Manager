@@ -8,8 +8,9 @@ import { applyKironPipeline } from "@/lib/kiron-pipeline";
 import { addCollaborator, addDealContact, linkContactToCompany } from "@/lib/links";
 import type { Actor } from "@/lib/permissions";
 import { createRecord, updateRecord, withTx } from "@/lib/records";
-import { askForSignOffs, runDailyRules } from "@/lib/stage-engine";
+import { askForGoLive, askForSignOffs, runDailyRules } from "@/lib/stage-engine";
 import { addTeamMember, createTeam, TECH_REVIEWERS, updateTeam } from "@/lib/teams";
+import { confirmGoLive } from "@/lib/go-live";
 
 // Fills an EMPTY database with a made-up company's CRM, for demos and the tour:
 //   npm run example:load    (refuses if there is any data)
@@ -17,6 +18,7 @@ import { addTeamMember, createTeam, TECH_REVIEWERS, updateTeam } from "@/lib/tea
 // Every name, email and figure here is invented. Never put real Kiron data in this file.
 
 const DAY = 86_400_000;
+const dayOffset = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
 const VANILLA = "A Generic (Vanilla) integration";
 const CUSTOM = "A Bespoke (Custom) Integration";
 
@@ -60,6 +62,7 @@ export async function loadExampleData() {
   const rae = await user(admin, "Rae Reviewer", "viewer"); // signs off technical reviews
   const fran = await user(admin, "Fran Finance", "viewer"); // reads, and sees fees and rates
   const sky = await user(admin, "Sky Support", "viewer"); // reads, but not fees and rates
+  const dee = await user(admin, "Dee Developer", "viewer"); // VSE dev team
 
   // The sales playbook's fields and stage rules, as an admin would set them up in one click
   await applyKironPipeline(admin);
@@ -70,12 +73,16 @@ export async function loadExampleData() {
     ["Account Management", [admin, alex]],
     ["Commercial", [morgan]],
     ["Risk, Legal, & Compliance", [lee]],
-    ["Development", [rae]],
+    ["Development (Betman)", [rae]],
+    ["Development (VSE)", [dee]],
     ["Finance", [fran]],
     ["Support & Installations", [sky]],
   ] as const) {
     const id = (await createTeam(admin, { name, kind: "department" }))!;
-    for (const m of members) await addTeamMember(admin, id, m.id);
+    for (const m of members) {
+      await addTeamMember(admin, id, m.id);
+      m.teamIds = [...(m.teamIds ?? []), id];
+    }
     if (name === "Finance") await updateTeam(admin, id, { seesCommercials: true });
   }
   const reviewers = (await db.execute(sql`select id from teams where name = ${TECH_REVIEWERS}`)).rows[0].id as string;
@@ -142,14 +149,26 @@ export async function loadExampleData() {
   await setStage(riverstone, "proposal", 12);
   const bluebay2 = await deal(sam, "Bluebay – Sportsbook Add-on", "Bluebay Gaming Ltd", "15000", { "p.via_aggregator": false, "p.lead_source": "Independently sourced", "p.integration_type": VANILLA, "p.billing_currency": "EUR" });
   await setStage(bluebay2, "legal_compliance", 4);
-  const kestrelWon = await deal(jo, "Kestrel – Retail Screens", "Kestrel Sports Ltd", "7000", { "p.via_aggregator": false, "p.lead_source": "Kiron Marketing", "p.integration_type": VANILLA });
+  const kestrelWon = await deal(jo, "Kestrel – Retail Screens", "Kestrel Sports Ltd", "7000", {
+    "p.via_aggregator": false, "p.lead_source": "Kiron Marketing", "p.integration_type": VANILLA, "p.distribution_platform": "BetMan Retail",
+    // Everything Closed Won asks for is in, so the departments are confirming their handovers.
+    "p.contract_counter_signed_date": dayOffset(-3), "p.teams_group_link": "teams.example.test/g/kestrel", "p.included_in_budget": true,
+    "p.anticipated_go_live_date": dayOffset(7), "p.live_date": dayOffset(7),
+  });
+  for (const role of ["finance", "marketing", "support"] as const) await addDealContact(jo, kestrelWon, ct.Grace, role);
   await setStage(kestrelWon, "closed_won", 2);
-  const live1 = await deal(sam, "Northgate – Live Casino", "Northgate Bets Ltd", "30000", { "p.via_aggregator": false, "p.lead_source": "SBC Barcelona", "p.integration_type": VANILLA, "p.billing_currency": "USD", "p.agreement_signed_internally": true });
+  const live1 = await deal(sam, "Northgate – Live Casino", "Northgate Bets Ltd", "30000", { "p.via_aggregator": false, "p.lead_source": "SBC Barcelona", "p.integration_type": VANILLA, "p.billing_currency": "USD", "p.agreement_signed_internally": true,
+    "p.distribution_platform": "BetMan Online", "p.dedicated_server": true, "p.server_name": "NG-LIVE-01", "p.live_date": dayOffset(-210),
+  });
   await addDealContact(sam, live1, ct.Luca, "primary");
   await setStage(live1, "live_direct", 210);
-  const live2 = await deal(jo, "Summit – Virtual Football", "Summit Play Ltd", "11000", { "p.lead_source": "ICE Barcelona 2025", "p.via_aggregator": true, viaAggregatorId: co["Example Aggregator Ltd"], "p.integration_type": VANILLA });
+  const live2 = await deal(jo, "Summit – Virtual Football", "Summit Play Ltd", "11000", { "p.lead_source": "ICE Barcelona 2025", "p.via_aggregator": true, viaAggregatorId: co["Example Aggregator Ltd"], "p.integration_type": VANILLA,
+    "p.distribution_platform": "VSE", "p.live_date": dayOffset(-120),
+  });
   await setStage(live2, "live_aggregator", 120);
-  const live3 = await deal(sam, "Harbour – Instant Win", "Harbour Lotteries Ltd", "16000", { "p.via_aggregator": false, "p.lead_source": "Independently sourced", "p.integration_type": VANILLA, "p.agreement_signed_internally": true });
+  const live3 = await deal(sam, "Harbour – Instant Win", "Harbour Lotteries Ltd", "16000", { "p.via_aggregator": false, "p.lead_source": "Independently sourced", "p.integration_type": VANILLA, "p.agreement_signed_internally": true,
+    "p.distribution_platform": "BetMan Online", "p.live_date": dayOffset(-300),
+  });
   await setStage(live3, "live_direct", 300);
   const stale = await deal(jo, "Copperline – Kiosk Pilot", "Copperline Retail Ltd", "3000", { "p.lead_source": "SBC Barcelona" });
   await setStage(stale, "customer_engagement", 61); // will go On Hold
@@ -181,6 +200,10 @@ export async function loadExampleData() {
   await runDailyRules();
   await raiseAddendum(alex, live3, { type: "new_product", details: "Add the new scratchcard range to their site from next month." });
   await withTx((tx) => askForSignOffs(tx, harbour)); // Harbour waits on the technical review
+  // Kestrel is going live: Legal and Finance have confirmed, Support and Dev haven't yet.
+  await withTx((tx) => askForGoLive(tx, kestrelWon));
+  await confirmGoLive(lee, kestrelWon, "legal");
+  await confirmGoLive(fran, kestrelWon, "finance", "Billing set up from the live date");
 
   return { deals: 15 };
 }

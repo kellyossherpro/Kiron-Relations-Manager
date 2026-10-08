@@ -4,7 +4,7 @@ import type { ObjectType } from "@/db/schema";
 import { NotFoundError, PermissionError, RuleError, translateDbError } from "./errors";
 import { deriveValue, FieldError, fieldsFor, normalizeValue, PROP_PREFIX, readFieldValue, sameValue, type FieldSpec } from "./fields";
 import { canCreate, canDelete, canEditField, canMoveStage, OWNER_EXCEPTION_STAGES, type Actor } from "./permissions";
-import { askForSignOffs, autoAdvance, handOverToAccountManager } from "./stage-engine";
+import { askForGoLive, askForSignOffs, autoAdvance, handOverToAccountManager } from "./stage-engine";
 
 export const TABLES: Record<ObjectType, string> = { company: "companies", contact: "contacts", deal: "deals" };
 
@@ -230,6 +230,7 @@ export async function moveDealStage(
       where deal_id = ${dealId} and status = 'open'`);
     if (stage.rows[0].kind === "won") await handOverToAccountManager(tx, dealId);
     await askForSignOffs(tx, dealId);
+    await askForGoLive(tx, dealId);
     return { status: "moved" };
   });
 }

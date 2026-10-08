@@ -227,6 +227,8 @@ export const KIRON_RULES: Record<string, Rule[]> = {
     need("IP for whitelisting", ["Distribution platform", "VSE"]),
     need("IP for whitelisting", ["Distribution platform", "VSE Only"]),
     need("Live date"),
+    // Then Legal, Finance, Support and Dev each confirm their handover before the deal goes Live.
+    { kind: "go_live_confirmed" },
   ],
 };
 

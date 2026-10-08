@@ -4,7 +4,9 @@ import { AdminStageRules } from "@/components/admin-stage-rules";
 import { kironPipelineSummary } from "@/lib/kiron-pipeline";
 import { conditionText, loadPipelineConfig, requirementLabel } from "@/lib/stage-engine";
 import { db } from "@/db";
+import { AdminGoLive } from "@/components/admin-go-live";
 import { AdminTeams } from "@/components/admin-teams";
+import { GO_LIVE_TEAM_SLOTS, goLiveTeams } from "@/lib/go-live";
 import { AdminUsers } from "@/components/admin-users";
 import { canManageUsersAndFields } from "@/lib/permissions";
 import { listDefinitions, listUsers } from "@/lib/queries";
@@ -17,14 +19,15 @@ export const metadata = { title: "Admin" };
 export default async function AdminPage() {
   const actor = await requireActor();
   if (!canManageUsersAndFields(actor)) return <p>Only admins can see this page.</p>;
-  const [users, defs, cfg, buttons, teams, teamNames, kironSetUp] = await Promise.all([
-    listUsers(true), listDefinitions(undefined, true), loadPipelineConfig(db), dealButtons(), listTeams(), teamNamesByUser(), kironOrgSetUp(),
+  const [users, defs, cfg, buttons, teams, teamNames, kironSetUp, goLive] = await Promise.all([
+    listUsers(true), listDefinitions(undefined, true), loadPipelineConfig(db), dealButtons(), listTeams(), teamNamesByUser(), kironOrgSetUp(), goLiveTeams(db),
   ]);
   return (
     <div className="space-y-5">
       <h1 className="h1">Admin</h1>
       <AdminUsers users={users.map((u) => ({ ...u, teams: teamNames[u.id] ?? [] }))} meId={actor.id} />
       <AdminTeams teams={teams} kironSetUp={kironSetUp} people={users.filter((u) => u.active).map((u) => ({ id: u.id, label: u.title ? `${u.name} · ${u.title}` : u.name }))} />
+      <AdminGoLive slots={GO_LIVE_TEAM_SLOTS.map((s) => ({ slot: s.slot, label: s.label, teamId: goLive[s.slot] }))} teams={teams.map((t) => ({ id: t.id, name: t.name }))} />
       <AdminFields defs={defs} teams={teams.map((t) => ({ id: t.id, name: t.name }))} />
       <AdminStageRules
         playbook={kironPipelineSummary()}

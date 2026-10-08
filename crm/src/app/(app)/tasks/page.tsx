@@ -4,18 +4,36 @@ import { date } from "@/lib/format";
 import { myOpenTasks } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
 import { signOffsWaiting } from "@/lib/stage-engine";
+import { goLiveWaiting } from "@/lib/go-live";
 
 export const metadata = { title: "My tasks" };
 
 export default async function TasksPage() {
   const actor = await requireActor();
-  const [tasks, signOffs] = await Promise.all([myOpenTasks(actor.id), signOffsWaiting(actor.teamIds ?? [])]);
+  const [tasks, signOffs, handovers] = await Promise.all([myOpenTasks(actor.id), signOffsWaiting(actor.teamIds ?? []), goLiveWaiting(actor.teamIds ?? [])]);
   const open = tasks.filter((t) => !t.completedAt);
   const done = tasks.filter((t) => t.completedAt);
   const now = new Date();
   return (
     <div className="max-w-3xl space-y-5">
       <h1 className="h1">My tasks</h1>
+      {handovers.length > 0 && (
+        <section className="card border-warn/40 p-5" aria-label="Go-live handovers waiting for you">
+          <h2 className="h2 mb-1">Go-live handovers waiting for you ({handovers.length})</h2>
+          <p className="mb-3 text-sm text-muted">Won deals your department still has to confirm. Open the deal and press Confirm when your side is ready.</p>
+          <ul className="space-y-2">
+            {handovers.map((h) => (
+              <li key={`${h.dealId}-${h.key}`} className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-2 text-sm last:border-0">
+                <span>
+                  <Link href={`/deals/${h.dealId}`} className="font-bold text-brand-dark hover:underline">{h.dealName}</Link>
+                  <span className="text-muted"> · {h.label} handover</span>
+                </span>
+                <span className="text-xs text-muted">{h.liveDate ? `Live date ${date(h.liveDate)}` : "No Live date yet"}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {signOffs.length > 0 && (
         <section className="card border-warn/40 p-5" aria-label="Waiting for your sign-off">
           <h2 className="h2 mb-1">Waiting for your sign-off ({signOffs.length})</h2>

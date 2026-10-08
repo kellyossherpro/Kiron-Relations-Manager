@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { ActivityPanel } from "@/components/activity-panel";
 import { AddendumPanel } from "@/components/addendum-panel";
 import { DeleteRecord } from "@/components/delete-record";
+import { GoLivePanel } from "@/components/go-live-panel";
+import { db } from "@/db";
+import { goLiveChecks } from "@/lib/go-live-checks";
 import { HistoryList } from "@/components/history-list";
 import { LinkAdder, UnlinkButton } from "@/components/link-adder";
 import { RecordFields } from "@/components/record-fields";
@@ -11,7 +14,7 @@ import { DEAL_CONTACT_ROLES } from "@/db/schema";
 import { NotFoundError } from "@/lib/errors";
 import { DEAL_CONTACT_ROLE_LABEL, plural } from "@/lib/format";
 import { dealAddendums } from "@/lib/addendums";
-import { canDelete, canEditRecord, canFinishAddendum, canLogActivity, canMoveStage, canRaiseAddendum, isManager } from "@/lib/permissions";
+import { canConfirmGoLive, canDelete, canEditRecord, canFinishAddendum, canLogActivity, canMoveStage, canRaiseAddendum, isManager } from "@/lib/permissions";
 import { companyOptions, contactOptions, dealDaysInStage, getDealLinks, getRecord, listActivities, listHistory, listStages, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
 import { isShown } from "@/lib/conditions";
@@ -43,6 +46,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     dealAddendums(id),
     dealButtons(),
   ]);
+  const goLive = (await goLiveChecks(db, [{ id, properties: row.properties as Record<string, unknown> }])).get(id) ?? [];
   const shownButtons = buttons.filter((b) => isShown({ key: "", showWhen: b.showWhen }, values));
   const collabIds = links.collaborators.map((c) => c.id);
   const ownerId = row.owner_id;
@@ -59,6 +63,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const laterGroups = [...new Set(specs.map((f) => f.group).filter((g): g is string => !!g))].filter((g) =>
     ahead.some((s) => g === s.label || g.startsWith(`${s.label}:`)),
   );
+  const showGoLive = stage?.kind === "won" || (["live", "change"].includes(stage?.kind ?? "") && goLive.some((c) => c.confirmed));
   const showAddendums = stage?.kind === "live" || stage?.kind === "change" || addendums.length > 0;
   const names = Object.fromEntries([...userOptions, ...companies].map((o) => [o.id, o.label]));
 
@@ -88,6 +93,14 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             </p>
           )}
           <StageMover dealId={id} current={String(row.stage_key)} stages={stages} allowed={allowedStages} checklist={evaluation?.requirements ?? []} nextLabel={evaluation?.next?.label ?? null} />
+          {showGoLive && (
+            <GoLivePanel
+              dealId={id}
+              isWon={stage?.kind === "won"}
+              liveDate={(values["p.live_date"] as string | null) ?? null}
+              checks={goLive.map((c) => ({ key: c.key, label: c.label, teamNames: c.teamNames, confirmed: c.confirmed, canConfirm: canConfirmGoLive(actor, c.teamIds) }))}
+            />
+          )}
           {showAddendums && (
             <AddendumPanel
               dealId={id}

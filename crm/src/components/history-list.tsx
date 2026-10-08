@@ -1,5 +1,7 @@
 import { dateTime, money } from "@/lib/format";
 
+const GO_LIVE_LABEL: Record<string, string> = { legal: "Legal", finance: "Finance", support: "Support", dev: "Dev" };
+
 type Entry = { id: number; action: string; field: string | null; oldValue: unknown; newValue: unknown; at: string; userName: string | null };
 
 function show(v: unknown, names: Record<string, string> = {}) {
@@ -29,6 +31,14 @@ export function HistoryList({ entries, labels, stageLabels, names = {}, moneyFie
               Moved from <strong>{stageLabels[String(e.oldValue)] ?? show(e.oldValue)}</strong> to <strong>{stageLabels[nv.stage] ?? nv.stage}</strong>
               {nv.reason && <span className="text-muted"> · &ldquo;{nv.reason}&rdquo;</span>}
             </>
+          );
+        } else if (e.action === "go_live") {
+          const nv = e.newValue as { confirmed: boolean; note?: string | null };
+          const which = GO_LIVE_LABEL[(e.field ?? "").replace("go_live.", "")] ?? "a";
+          text = nv.confirmed ? (
+            <>Confirmed the <strong>{which}</strong> go-live handover{nv.note && <span className="text-muted"> · &ldquo;{nv.note}&rdquo;</span>}</>
+          ) : (
+            <>Undid the <strong>{which}</strong> go-live handover</>
           );
         } else if (e.action === "link" || e.action === "unlink") text = e.action === "link" ? "Added a link" : "Removed a link";
         else

@@ -6,10 +6,14 @@ import { requireActor } from "@/lib/session";
 import { unreadCount } from "@/lib/stage-rules-admin";
 import { openAddendumCount } from "@/lib/addendums";
 import { signOffsWaiting } from "@/lib/stage-engine";
+import { goLiveWaiting } from "@/lib/go-live";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireActor();
-  const [unread, addendums, signOffs] = await Promise.all([unreadCount(actor.id), openAddendumCount(), signOffsWaiting(actor.teamIds ?? [])]);
+  const [unread, addendums, signOffs, handovers] = await Promise.all([
+    unreadCount(actor.id), openAddendumCount(), signOffsWaiting(actor.teamIds ?? []), goLiveWaiting(actor.teamIds ?? []),
+  ]);
+  const waiting = signOffs.length + handovers.length;
   return (
     <div className="min-h-screen lg:flex">
       <aside className="bg-black lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col">
@@ -25,8 +29,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLink href="/contacts">Contacts</NavLink>
           <NavLink href="/tasks">
             My tasks
-            {signOffs.length > 0 && <span className="ml-auto rounded-full bg-warn-soft px-2 text-xs text-warn tabular-nums" aria-label={`${signOffs.length} sign-offs waiting`}>{signOffs.length}</span>}
+            {waiting > 0 && <span className="ml-auto rounded-full bg-warn-soft px-2 text-xs text-warn tabular-nums" aria-label={`${waiting} sign-offs and handovers waiting`}>{waiting}</span>}
           </NavLink>
+          <NavLink href="/live">Live board</NavLink>
           <NavLink href="/addendums">
             Addendums
             {addendums > 0 && <span className="ml-auto rounded-full bg-warn-soft px-2 text-xs text-warn tabular-nums" aria-label={`${addendums} in progress`}>{addendums}</span>}

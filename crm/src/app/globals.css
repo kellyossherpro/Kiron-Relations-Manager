@@ -74,3 +74,24 @@ body {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap;
   }
 
+
+/* Live board: the ticker strip runs like a stock-market tape (still for people who prefer less motion). */
+@keyframes krm-ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes krm-blink {
+  50% { opacity: 0.35; }
+}
+@utility ticker {
+  animation: krm-ticker 60s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+@utility blink {
+  animation: krm-blink 1.6s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

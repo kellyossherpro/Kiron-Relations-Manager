@@ -49,6 +49,7 @@ src/lib/settings.ts     company-wide settings (buttons on deals)
 src/lib/teams.ts        departments and groups; "Set up Kiron's people" (from kiron-org.ts)
 src/lib/kiron-org.ts    Kiron's departments, people, job titles (organogram; never emails or phones)
 src/lib/view.ts         what a page may show this person (fields, values, history)
+src/lib/go-live.ts      go-live handovers: confirm/undo, who confirms, Live board data (rules in go-live-checks.ts)
 src/lib/links.ts        contacts↔companies, deal contacts with roles, collaborators
 src/lib/activities.ts   notes, calls, meetings, tasks
 src/lib/admin.ts        first admin, people, field definitions
@@ -88,6 +89,13 @@ Rules that matter:
   department or group only (`edit_team_id`, e.g. Technical review performed → Technical reviewers); everyone
   in the group is notified when a deal reaches a stage waiting on it, and it shows on their My tasks. Admins
   can always step in. Add backups to the group for holidays.
+- **Go-live**: on a won deal, Legal, Finance, Support and Dev each confirm their handover (`go_live_confirmations`,
+  one per deal and check). Dev is the platform's team (BetMan → Development (Betman), VSE → Development (VSE),
+  anything else → either); Admin → Go-live handovers picks the departments (defaults by name). The stage rule
+  "go_live_confirmed" (added at Closed Won by the playbook) holds the deal until all four have confirmed, then
+  it moves to Live by itself. When everything else for the stage is in, each department is notified once and
+  the deal shows on their My tasks. Confirmations can be undone until the deal goes Live. `/live` is the
+  Live board: going-live deals with each handover's status, and every live client; it refreshes every 30 s.
 - **Fees and rates** (`commercial` fields) are left out of the page, the values and the history for viewers,
   unless one of their departments "can see fees and rates" (Finance). Other roles always see them.
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.

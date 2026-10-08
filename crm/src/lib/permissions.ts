@@ -79,3 +79,8 @@ export function canRaiseAddendum(actor: Actor, record: { ownerId: string | null 
 export function canFinishAddendum(actor: Actor, record: { ownerId: string | null }, opts: { collaboratorIds?: string[] } = {}) {
   return actor.role === "account_manager" || canEditRecord(actor, record, opts);
 }
+
+// Go-live handovers: someone in the department that does the handover (admins can step in).
+export function canConfirmGoLive(actor: Actor, teamIds: string[]) {
+  return actor.role === "admin" || teamIds.some((t) => (actor.teamIds ?? []).includes(t));
+}

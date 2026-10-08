@@ -249,8 +249,9 @@ export const auditLog = pgTable(
 // - has_contact: at least one contact on the deal (optionally with a given role)
 // - has_primary_company: the contracting company is set
 // - has_collaborator: at least one collaborator
+// - go_live_confirmed: Legal, Finance, Support and Dev have each confirmed their go-live handover
 // A requirement can apply only when another field has a given value ("when").
-export const REQUIREMENT_KINDS = ["field", "company_field", "has_contact", "has_primary_company", "has_collaborator"] as const;
+export const REQUIREMENT_KINDS = ["field", "company_field", "has_contact", "has_primary_company", "has_collaborator", "go_live_confirmed"] as const;
 export type RequirementKind = (typeof REQUIREMENT_KINDS)[number];
 
 export const stageRequirements = pgTable(
@@ -369,3 +370,20 @@ export const teamMembers = pgTable(
   (t) => [primaryKey({ columns: [t.teamId, t.userId] }), index("team_members_user_idx").on(t.userId)],
 );
 
+
+// Go-live: each department (Legal, Finance, Support, Dev) confirms its handover on a won deal.
+// One row per deal and check; `team_id` is the department that confirmed (for Dev, the platform's team).
+export const GO_LIVE_CHECK_KEYS = ["legal", "finance", "support", "dev"] as const;
+export const goLiveConfirmations = pgTable(
+  "go_live_confirmations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dealId: uuid("deal_id").notNull().references(() => deals.id),
+    checkKey: text("check_key").$type<(typeof GO_LIVE_CHECK_KEYS)[number]>().notNull(),
+    teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
+    confirmedBy: uuid("confirmed_by").notNull().references(() => users.id),
+    note: text("note"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("go_live_one_per_check").on(t.dealId, t.checkKey)],
+);

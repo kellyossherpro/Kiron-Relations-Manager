@@ -16,6 +16,8 @@ const KIND_LABEL: Record<string, string> = {
   addendum_cancelled: "Addendum cancelled",
   handover_owner: "Handed over",
   signoff_needed: "Sign-off needed",
+  golive_needed: "Go-live handover",
+  golive_confirmed: "Handover confirmed",
   handover_reminder: "Action needed",
 };
 
@@ -40,7 +42,7 @@ export default async function NotificationsPage() {
         <ul className="card divide-y divide-line">
           {items.map((n) => (
             <li key={n.id} className={`flex gap-3 p-4 ${n.readAt ? "" : "bg-brand-soft/60"}`}>
-              <span className={`pill h-fit ${n.kind === "stage_auto" ? "bg-brand text-ink" : n.kind === "stage_stale" || n.kind === "signoff_needed" ? "bg-warn-soft text-warn" : "bg-ink text-white"}`}>{KIND_LABEL[n.kind] ?? n.kind}</span>
+              <span className={`pill h-fit ${n.kind === "stage_auto" ? "bg-brand text-ink" : n.kind === "stage_stale" || n.kind === "signoff_needed" || n.kind === "golive_needed" ? "bg-warn-soft text-warn" : "bg-ink text-white"}`}>{KIND_LABEL[n.kind] ?? n.kind}</span>
               <div className="min-w-0 text-sm">
                 <p className={n.readAt ? "" : "font-bold"}>{n.message}</p>
                 <p className="text-xs text-muted">

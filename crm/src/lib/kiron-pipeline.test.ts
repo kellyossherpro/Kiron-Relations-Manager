@@ -8,6 +8,7 @@ import { applyKironPipeline, KIRON_FIELDS, kironPipelineSummary } from "./kiron-
 import { addCollaborator, addDealContact } from "./links";
 import type { Actor } from "./permissions";
 import { createRecord, moveDealStage, updateRecord } from "./records";
+import { confirmGoLive } from "./go-live";
 import { evaluateDeal } from "./stage-engine";
 import { listNotifications } from "./stage-rules-admin";
 import { dealButtons } from "./settings";
@@ -62,10 +63,18 @@ async function setUp() {
   await applyKironPipeline(admin);
   // Signs off the technical review; read-only otherwise, like most of the Dev team.
   const reviewer = await joinTeam(await makeUser("viewer", "Rae Reviewer"), "Technical reviewers");
+  // One person per go-live handover, in the departments KRM picks by name.
+  const golive = {
+    legal: await joinTeam(await makeUser("legal", "Lou Legal"), "Risk, Legal, & Compliance"),
+    finance: await joinTeam(await makeUser("viewer", "Fin Finance"), "Finance"),
+    support: await joinTeam(await makeUser("viewer", "Sol Support"), "Support & Installations"),
+    devBetman: await joinTeam(await makeUser("viewer", "Ben Betman"), "Development (Betman)"),
+    devVse: await joinTeam(await makeUser("viewer", "Vee VSE"), "Development (VSE)"),
+  };
   const company = await createRecord(sales, "company", { name: "Example Operator Ltd" });
   const person = await createRecord(sales, "contact", { firstName: "Ola", lastName: "Example", email: "ola@example.test" });
   const deal = await createRecord(sales, "deal", { name: "Example Operator – BetMan Retail" });
-  return { admin, sales, am, legal, reviewer, company, person, deal };
+  return { admin, sales, am, legal, reviewer, golive, company, person, deal };
 }
 
 // Lead → Customer Engagement → Qualified Lead, the same for every route.
@@ -167,10 +176,26 @@ describe("a deal through Kiron's pipeline", () => {
       "p.included_in_budget": true,
       "p.anticipated_go_live_date": "2026-12-01",
     });
-    expect(await missing(s.deal)).toEqual(["Finance contact added", "Marketing contact added", "Support contact added", "Live date"]);
+    expect(await missing(s.deal)).toEqual([
+      "Finance contact added", "Marketing contact added", "Support contact added", "Live date",
+      "Go-live confirmed by Legal, Finance, Support and Dev (waiting for Legal, Finance, Support, Dev)",
+    ]);
     for (const role of ["finance", "marketing", "support"]) await addDealContact(s.am, s.deal, s.person, role);
     await fill(s.am, s.deal, { "p.live_date": "2026-12-03" });
-    expect(await stageOf(s.deal)).toBe("live_direct");
+    // Everything's in, so each department is asked for its go-live handover; BetMan Retail → BetMan dev team.
+    expect(await stageOf(s.deal)).toBe("closed_won");
+    expect(await missing(s.deal)).toEqual(["Go-live confirmed by Legal, Finance, Support and Dev (waiting for Legal, Finance, Support, Dev)"]);
+    for (const who of [s.golive.legal, s.golive.finance, s.golive.support, s.golive.devBetman]) {
+      expect((await listNotifications(who.id)).filter((n) => n.kind === "golive_needed")).toHaveLength(1);
+    }
+    expect((await listNotifications(s.golive.devVse.id)).filter((n) => n.kind === "golive_needed")).toHaveLength(0);
+    await expect(confirmGoLive(s.golive.devVse, s.deal, "dev")).rejects.toThrow(PermissionError);
+    await expect(confirmGoLive(s.am, s.deal, "finance")).rejects.toThrow(PermissionError);
+    await confirmGoLive(s.golive.legal, s.deal, "legal");
+    await confirmGoLive(s.golive.finance, s.deal, "finance", "Billing set up from 1 December");
+    await confirmGoLive(s.golive.support, s.deal, "support");
+    expect(await missing(s.deal)).toEqual(["Go-live confirmed by Legal, Finance, Support and Dev (waiting for Dev)"]);
+    expect((await confirmGoLive(s.golive.devBetman, s.deal, "dev")).movedTo).toEqual(["live_direct"]);
   });
 
   it("aggregator route: skips Legal & Compliance and ends in Live via Aggregator", async () => {
@@ -195,6 +220,9 @@ describe("a deal through Kiron's pipeline", () => {
       "p.anticipated_go_live_date": "2026-12-01",
       "p.live_date": "2026-12-02",
     }); // no counter-signed date: there's no Kiron contract
+    for (const [who, key] of [[s.golive.legal, "legal"], [s.golive.finance, "finance"], [s.golive.support, "support"], [s.golive.devBetman, "dev"]] as const) {
+      await confirmGoLive(who, s.deal, key);
+    }
     expect(await stageOf(s.deal)).toBe("live_aggregator");
   });
 

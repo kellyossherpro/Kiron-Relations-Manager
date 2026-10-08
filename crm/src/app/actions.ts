@@ -23,6 +23,8 @@ import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord,
 import { requireActor, signInAs, signOut } from "@/lib/session";
 import { GATE_COOKIE, gateToken, passwordMatches, safeNext } from "@/lib/site-gate";
 import { applyKironPipeline } from "@/lib/kiron-pipeline";
+import { confirmGoLive, setGoLiveTeams, undoGoLive, type GoLiveTeams } from "@/lib/go-live";
+import type { CheckKey } from "@/lib/go-live-checks";
 import { addTeamMember, applyKironOrg, createTeam, deleteTeam, removeTeamMember, updateTeam, type TeamKind } from "@/lib/teams";
 import { addDealButton, removeDealButton, type DealButton } from "@/lib/settings";
 import { addRequirement, addTransition, markAllRead, removeRequirement, removeTransition, type RequirementInput } from "@/lib/stage-rules-admin";
@@ -281,6 +283,31 @@ export async function updateFieldAction(
 ): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => updateFieldDefinition(actor, id, input));
+  refresh();
+  return res;
+}
+
+// ---------- go-live ----------
+
+export async function confirmGoLiveAction(dealId: string, key: CheckKey, note?: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(async () => {
+    await confirmGoLive(actor, dealId, key, note);
+  });
+  refresh();
+  return res;
+}
+
+export async function undoGoLiveAction(dealId: string, key: CheckKey): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => undoGoLive(actor, dealId, key));
+  refresh();
+  return res;
+}
+
+export async function setGoLiveTeamsAction(input: Partial<GoLiveTeams>): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => setGoLiveTeams(actor, input));
   refresh();
   return res;
 }
