@@ -1,7 +1,7 @@
 // Kiron's departments and people, from the organogram Kelly shared on 2026-10-08. Names, job titles
 // and who each person reports to only: never email addresses or phone numbers (CLAUDE.md).
 // People are matched to their Microsoft account when they first sign in.
-// Still to come: PMO (3 people, cut off in the screenshot).
+// Complete as of 2026-10-08: 20 departments, 117 people. One surname still to confirm (Kefentse).
 
 export type OrgPerson = { name: string; title: string; reportsTo?: string };
 export type OrgDepartment = { name: string; people: OrgPerson[] };
@@ -214,6 +214,14 @@ export const KIRON_ORG: OrgDepartment[] = [
       { name: "Jason Pretorius", title: "Co-Chief Executive Officer" },
       { name: "Paul Shackleton", title: "CFO", reportsTo: "Steven Spartinos" },
       { name: "Steven Spartinos", title: "Co-Chief Executive Officer" },
+    ],
+  },
+  {
+    name: "PMO",
+    people: [
+      { name: "Melissa Gillot", title: "Project Coordinator", reportsTo: "Viren Ramsunder" },
+      { name: "Thereshen Naidoo", title: "Technical Project Manager", reportsTo: "Viren Ramsunder" },
+      { name: "Viren Ramsunder", title: "Project Manager", reportsTo: "Justin Frost" },
     ],
   },
 ];
