@@ -1,5 +1,6 @@
 "use client";
 
+import type { ShowWhen } from "@/lib/conditions";
 import { COMPANY_TYPE_LABEL, date, money } from "@/lib/format";
 import { SearchSelect, type Option } from "./search-select";
 
@@ -11,9 +12,13 @@ export type ClientField = {
   required?: boolean;
   editable: boolean;
   group?: string;
+  showWhen?: ShowWhen | null;
 };
 
 export type Lookups = { companies: Option[]; users: Option[] };
+
+// Above this many options, choices are searched instead of listed.
+const LONG_LIST = 12;
 
 function optionLabel(field: ClientField, v: string) {
   return field.key === "companyType" ? (COMPANY_TYPE_LABEL[v] ?? v) : v;
@@ -88,6 +93,9 @@ export function FieldInput({
         </select>
       );
     case "select":
+      // Long lists (countries) are quicker to search than to scroll.
+      if ((field.options?.length ?? 0) > LONG_LIST)
+        return <SearchSelect id={id} options={(field.options ?? []).map((o) => ({ id: o, label: o }))} value={str || null} onChange={onChange} placeholder="Type to search" />;
       return (
         <select id={id} className={cls} value={str} onChange={(e) => onChange(e.target.value || null)}>
           <option value="">—</option>
@@ -98,6 +106,31 @@ export function FieldInput({
       );
     case "multiselect": {
       const selected = Array.isArray(value) ? (value as string[]) : [];
+      if ((field.options?.length ?? 0) > LONG_LIST) {
+        // Long lists (games, markets): what's picked shows as chips; type to add more.
+        return (
+          <div className="space-y-2">
+            {selected.length > 0 && (
+              <ul className="flex flex-wrap gap-2" aria-label={`${field.label} chosen`}>
+                {selected.map((o) => (
+                  <li key={o} className="pill flex items-center gap-1 border border-ink bg-ink text-white">
+                    {o}
+                    <button type="button" aria-label={`Remove ${o}`} className="ml-1 font-black text-white/70 hover:text-white" onClick={() => onChange(selected.filter((x) => x !== o))}>×</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <SearchSelect
+              id={id}
+              options={(field.options ?? []).filter((o) => !selected.includes(o)).map((o) => ({ id: o, label: o }))}
+              value={null}
+              allowEmpty={false}
+              onChange={(o) => o && onChange([...selected, o])}
+              placeholder={selected.length ? "Type to add another" : "Type to search and add"}
+            />
+          </div>
+        );
+      }
       return (
         <div id={id} className="flex flex-wrap gap-2">
           {field.options?.map((o) => {

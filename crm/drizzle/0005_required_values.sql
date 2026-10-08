@@ -1,0 +1,1 @@
+ALTER TABLE "stage_requirements" ADD COLUMN "required_values" jsonb;

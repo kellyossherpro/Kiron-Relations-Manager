@@ -1,4 +1,5 @@
 import type { FieldType, ObjectType } from "@/db/schema";
+import type { ShowWhen } from "./conditions";
 
 // A field on a record is either a built-in column ("name", "website", ...) or an
 // admin-defined property, addressed as "p.<key>" and stored in `properties`.
@@ -13,6 +14,7 @@ export type FieldSpec = {
   column?: string; // database column name for built-in fields
   group?: string;
   extraEditorRoles?: string[];
+  showWhen?: ShowWhen | null;
 };
 
 export const CORE_FIELDS: Record<ObjectType, FieldSpec[]> = {
@@ -36,7 +38,7 @@ export const CORE_FIELDS: Record<ObjectType, FieldSpec[]> = {
     { key: "name", column: "name", label: "Deal name", type: "text", required: true },
     { key: "amountMonthly", column: "amount_monthly", label: "Anticipated monthly amount (USD)", type: "money" },
     { key: "primaryCompanyId", column: "primary_company_id", label: "Contracting company", type: "company" },
-    { key: "viaAggregatorId", column: "via_aggregator_id", label: "Via aggregator", type: "company" },
+    { key: "viaAggregatorId", column: "via_aggregator_id", label: "Aggregator", type: "company" },
     { key: "ownerId", column: "owner_id", label: "Owner", type: "user" },
   ],
 };
@@ -48,6 +50,7 @@ export type PropertyDefinitionLike = {
   options: string[];
   groupLabel: string | null;
   extraEditorRoles: string[];
+  showWhen?: ShowWhen | null;
   archived: boolean;
 };
 
@@ -61,6 +64,7 @@ export function fieldsFor(objectType: ObjectType, defs: PropertyDefinitionLike[]
       options: d.options,
       group: d.groupLabel ?? undefined,
       extraEditorRoles: d.extraEditorRoles,
+      showWhen: d.showWhen ?? null,
     }));
   return [...CORE_FIELDS[objectType], ...custom];
 }

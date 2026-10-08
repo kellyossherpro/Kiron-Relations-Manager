@@ -2,13 +2,13 @@ import "dotenv/config";
 import { sql } from "drizzle-orm";
 import { db, pool } from "@/db";
 import { raiseAddendum } from "@/lib/addendums";
-import { createFieldDefinition, createFirstAdmin, createUser } from "@/lib/admin";
+import { createFirstAdmin, createUser } from "@/lib/admin";
 import { logActivity } from "@/lib/activities";
+import { applyKironPipeline } from "@/lib/kiron-pipeline";
 import { addCollaborator, addDealContact, linkContactToCompany } from "@/lib/links";
 import type { Actor } from "@/lib/permissions";
 import { createRecord, updateRecord } from "@/lib/records";
 import { runDailyRules } from "@/lib/stage-engine";
-import { addRequirement, addTransition } from "@/lib/stage-rules-admin";
 
 // Fills an EMPTY database with a made-up company's CRM, for demos and the tour:
 //   npm run example:load    (refuses if there is any data)
@@ -16,6 +16,8 @@ import { addRequirement, addTransition } from "@/lib/stage-rules-admin";
 // Every name, email and figure here is invented. Never put real Kiron data in this file.
 
 const DAY = 86_400_000;
+const VANILLA = "A Generic (Vanilla) integration";
+const CUSTOM = "A Bespoke (Custom) Integration";
 
 async function isEmpty() {
   const r = await db.execute(sql`select (select count(*) from users) + (select count(*) from companies) + (select count(*) from deals) as n`);
@@ -54,19 +56,8 @@ export async function loadExampleData() {
   await user(admin, "Morgan Manager", "manager");
   await user(admin, "Lee Legal", "legal");
 
-  // Fields Kelly would add in Admin
-  await createFieldDefinition(admin, { objectType: "deal", label: "Lead source", type: "select", options: ["Event", "Website", "Referral", "Aggregator"] });
-  await createFieldDefinition(admin, { objectType: "deal", label: "Integration type", type: "select", options: ["Vanilla", "Custom"] });
-  await createFieldDefinition(admin, { objectType: "deal", label: "Billing currency", type: "select", options: ["USD", "EUR", "GBP", "ZAR"], groupLabel: "Commercials" });
-  await createFieldDefinition(admin, { objectType: "deal", label: "Agreement signed internally", type: "yesno", groupLabel: "Legal & Compliance", extraEditorRoles: ["legal"] });
-
-  // Stage rules
-  await addRequirement(admin, { stageKey: "lead", kind: "field", fieldKey: "p.lead_source" });
-  await addRequirement(admin, { stageKey: "lead", kind: "field", fieldKey: "amountMonthly" });
-  await addRequirement(admin, { stageKey: "lead", kind: "has_primary_company" });
-  await addRequirement(admin, { stageKey: "customer_engagement", kind: "has_contact", contactRole: "primary" });
-  await addRequirement(admin, { stageKey: "qualified_lead", kind: "field", fieldKey: "p.integration_type" });
-  await addTransition(admin, { fromStage: "qualified_lead", toStage: "feasibility", whenField: "p.integration_type", whenValue: "Custom" });
+  // The sales playbook's fields and stage rules, as an admin would set them up in one click
+  await applyKironPipeline(admin);
 
   // Companies
   const co: Record<string, string> = {};
@@ -100,37 +91,42 @@ export async function loadExampleData() {
   }
 
   // Deals: created as Lead, then placed where they'd be in a real pipeline.
+  // Every example operator is "based" somewhere; the Kestrel lead is still missing it.
   async function deal(owner: Actor, name: string, company: string, amount: string | null, extra: Record<string, unknown> = {}) {
-    return createRecord(owner, "deal", { name, primaryCompanyId: co[company], ...(amount ? { amountMonthly: amount } : {}), ...extra });
+    const country = company.startsWith("Kestrel") ? {} : { "p.country_where_operator_is_based": company.startsWith("Bluebay") ? "United Kingdom" : "South Africa" };
+    return createRecord(owner, "deal", { name, primaryCompanyId: co[company], ...country, ...(amount ? { amountMonthly: amount } : {}), ...extra });
   }
-  const bluebay = await deal(sam, "Bluebay – Online Casino Games", "Bluebay Gaming Ltd", null);
+  const bluebay = await deal(sam, "Bluebay – Online Casino Games", "Bluebay Gaming Ltd", null, {
+    "p.legal_entity_address": "1 Example Street, London",
+    "p.kiron_contracting_entity": "Mauritius",
+  });
   await addDealContact(sam, bluebay, ct.Priya, "primary");
   await addDealContact(sam, bluebay, ct.Tom, "finance");
   const copperline = await deal(sam, "Copperline – Retail Terminals", "Copperline Retail Ltd", null);
   await deal(jo, "Kestrel – Virtual Sports", "Kestrel Sports Ltd", "12000");
 
-  const northgate = await deal(jo, "Northgate – Web & App", "Northgate Bets Ltd", "18000", { "p.lead_source": "Website" }); // moves to Customer Engagement
+  const northgate = await deal(jo, "Northgate – Web & App", "Northgate Bets Ltd", "18000", { "p.lead_source": "Kiron Marketing" }); // moves to Customer Engagement
   await setStage(northgate, "customer_engagement", 9);
-  const harbour = await deal(sam, "Harbour – Lottery Draw Games", "Harbour Lotteries Ltd", "9000", { "p.lead_source": "Referral" });
+  const harbour = await deal(sam, "Harbour – Lottery Draw Games", "Harbour Lotteries Ltd", "9000", { "p.lead_source": "Independently sourced" });
   await addDealContact(sam, harbour, ct.Ben, "primary");
   await setStage(harbour, "qualified_lead", 34); // 30-day reminder
-  const summit = await deal(sam, "Summit – Custom Racing Feed", "Summit Play Ltd", "45000", { "p.lead_source": "Event", "p.integration_type": "Custom" });
+  const summit = await deal(sam, "Summit – Custom Racing Feed", "Summit Play Ltd", "45000", { "p.lead_source": "SBC Barcelona", "p.integration_type": CUSTOM });
   await addDealContact(sam, summit, ct.Aisha, "primary");
   await setStage(summit, "feasibility", 6);
-  const riverstone = await deal(jo, "Riverstone – Shop Estate Rollout", "Riverstone Entertainment Ltd", "22000", { "p.lead_source": "Event", "p.integration_type": "Vanilla" });
+  const riverstone = await deal(jo, "Riverstone – Shop Estate Rollout", "Riverstone Entertainment Ltd", "22000", { "p.lead_source": "SBC Barcelona", "p.integration_type": VANILLA });
   await setStage(riverstone, "proposal", 12);
-  const bluebay2 = await deal(sam, "Bluebay – Sportsbook Add-on", "Bluebay Gaming Ltd", "15000", { "p.lead_source": "Referral", "p.integration_type": "Vanilla", "p.billing_currency": "EUR" });
+  const bluebay2 = await deal(sam, "Bluebay – Sportsbook Add-on", "Bluebay Gaming Ltd", "15000", { "p.via_aggregator": false, "p.lead_source": "Independently sourced", "p.integration_type": VANILLA, "p.billing_currency": "EUR" });
   await setStage(bluebay2, "legal_compliance", 4);
-  const kestrelWon = await deal(jo, "Kestrel – Retail Screens", "Kestrel Sports Ltd", "7000", { "p.lead_source": "Website", "p.integration_type": "Vanilla" });
+  const kestrelWon = await deal(jo, "Kestrel – Retail Screens", "Kestrel Sports Ltd", "7000", { "p.via_aggregator": false, "p.lead_source": "Kiron Marketing", "p.integration_type": VANILLA });
   await setStage(kestrelWon, "closed_won", 2);
-  const live1 = await deal(sam, "Northgate – Live Casino", "Northgate Bets Ltd", "30000", { "p.lead_source": "Event", "p.integration_type": "Vanilla", "p.billing_currency": "USD", "p.agreement_signed_internally": true });
+  const live1 = await deal(sam, "Northgate – Live Casino", "Northgate Bets Ltd", "30000", { "p.via_aggregator": false, "p.lead_source": "SBC Barcelona", "p.integration_type": VANILLA, "p.billing_currency": "USD", "p.agreement_signed_internally": true });
   await addDealContact(sam, live1, ct.Luca, "primary");
   await setStage(live1, "live_direct", 210);
-  const live2 = await deal(jo, "Summit – Virtual Football", "Summit Play Ltd", "11000", { "p.lead_source": "Aggregator", "viaAggregatorId": co["Example Aggregator Ltd"], "p.integration_type": "Vanilla" });
+  const live2 = await deal(jo, "Summit – Virtual Football", "Summit Play Ltd", "11000", { "p.lead_source": "ICE Barcelona 2025", "p.via_aggregator": true, viaAggregatorId: co["Example Aggregator Ltd"], "p.integration_type": VANILLA });
   await setStage(live2, "live_aggregator", 120);
-  const live3 = await deal(sam, "Harbour – Instant Win", "Harbour Lotteries Ltd", "16000", { "p.lead_source": "Referral", "p.integration_type": "Vanilla", "p.agreement_signed_internally": true });
+  const live3 = await deal(sam, "Harbour – Instant Win", "Harbour Lotteries Ltd", "16000", { "p.via_aggregator": false, "p.lead_source": "Independently sourced", "p.integration_type": VANILLA, "p.agreement_signed_internally": true });
   await setStage(live3, "live_direct", 300);
-  const stale = await deal(jo, "Copperline – Kiosk Pilot", "Copperline Retail Ltd", "3000", { "p.lead_source": "Event" });
+  const stale = await deal(jo, "Copperline – Kiosk Pilot", "Copperline Retail Ltd", "3000", { "p.lead_source": "SBC Barcelona" });
   await setStage(stale, "customer_engagement", 61); // will go On Hold
 
   await addCollaborator(sam, bluebay, alex.id);
@@ -149,7 +145,7 @@ export async function loadExampleData() {
   await db.execute(sql`delete from notifications; delete from audit_log where action = 'stage'`);
 
   // Things KRM does by itself
-  await updateRecord(sam, "deal", copperline, { "p.lead_source": "Event", amountMonthly: "6000" }, { "p.lead_source": null, amountMonthly: null }); // moves on
+  await updateRecord(sam, "deal", copperline, { "p.lead_source": "SBC Barcelona", amountMonthly: "6000" }, { "p.lead_source": null, amountMonthly: null }); // moves on
   await runDailyRules();
   await raiseAddendum(alex, live3, { type: "new_product", details: "Add the new scratchcard range to their site from next month." });
 

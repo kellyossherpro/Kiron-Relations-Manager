@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { addRequirementAction, addTransitionAction, removeRequirementAction, removeTransitionAction } from "@/app/actions";
+import { addRequirementAction, addTransitionAction, applyKironPipelineAction, removeRequirementAction, removeTransitionAction } from "@/app/actions";
 import type { RequirementKind } from "@/db/schema";
 import { DEAL_CONTACT_ROLE_LABEL } from "@/lib/format";
 
@@ -20,10 +20,11 @@ const WHAT: { value: RequirementKind; label: string }[] = [
 
 // Fields a condition can depend on: ones with a fixed set of answers.
 const conditionable = (f: Field) => ["select", "multiselect", "yesno"].includes(f.type);
+const answersOf = (f: Field) => (f.type === "yesno" ? ["Yes", "No"] : (f.options ?? []));
 
 function ConditionPicker({ fields, field, value, onField, onValue, idPrefix }: { fields: Field[]; field: string; value: string; onField: (v: string) => void; onValue: (v: string) => void; idPrefix: string }) {
   const chosen = fields.find((f) => f.key === field);
-  const answers = chosen ? (chosen.type === "yesno" ? ["Yes", "No"] : (chosen.options ?? [])) : [];
+  const answers = chosen ? answersOf(chosen) : [];
   const usable = fields.filter(conditionable);
   return (
     <div className="grid gap-2 sm:grid-cols-2">
@@ -48,7 +49,36 @@ function ConditionPicker({ fields, field, value, onField, onValue, idPrefix }: {
   );
 }
 
-export function AdminStageRules({ stages, fields, requirements, routes }: { stages: Stage[]; fields: Field[]; requirements: Req[]; routes: Route[] }) {
+// Shown while no stage has rules: sets up the sales playbook's fields and rules in one go.
+function PlaybookStart({ playbook }: { playbook: { fields: number; rules: number; branches: number } }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <div className="mb-4 rounded-lg border border-brand bg-brand-soft/60 p-4">
+      <p className="font-bold">Start from the sales playbook</p>
+      <p className="mt-1 text-sm">
+        Adds the playbook&rsquo;s {playbook.fields} deal fields (with HubSpot&rsquo;s dropdown options) and {playbook.rules} rules: what each stage
+        needs, plus the {playbook.branches} branches (custom integrations go to Feasibility; aggregator deals skip Legal &amp; Compliance and end in
+        Live via Aggregator). You can change or remove any of it afterwards.
+      </p>
+      {msg && <p className="mt-2 text-sm text-danger" role="alert">{msg}</p>}
+      <button
+        className="btn-primary mt-3"
+        disabled={pending}
+        onClick={() => start(async () => {
+          const res = await applyKironPipelineAction();
+          setMsg(res.ok ? null : res.error);
+          router.refresh();
+        })}
+      >
+        {pending ? "Setting up…" : "Set up the playbook's rules"}
+      </button>
+    </div>
+  );
+}
+
+export function AdminStageRules({ stages, fields, requirements, routes, playbook }: { stages: Stage[]; fields: Field[]; requirements: Req[]; routes: Route[]; playbook: { fields: number; rules: number; branches: number } }) {
   const [open, setOpen] = useState<string | null>(stages[0]?.key ?? null);
   return (
     <section className="card p-5" aria-label="Stage rules">
@@ -57,6 +87,7 @@ export function AdminStageRules({ stages, fields, requirements, routes }: { stag
         For each stage, list what a deal needs before it can move on, and where it goes next. When everything is filled in, the deal moves by
         itself. A stage with nothing listed never moves on its own.
       </p>
+      {requirements.length === 0 && <PlaybookStart playbook={playbook} />}
       <ol className="space-y-2">
         {stages.map((s, i) => {
           const reqs = requirements.filter((r) => r.stageKey === s.key);
@@ -91,6 +122,7 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
   const [msg, setMsg] = useState<string | null>(null);
   const [kind, setKind] = useState<RequirementKind>("field");
   const [fieldKey, setFieldKey] = useState("");
+  const [mustBe, setMustBe] = useState<string[]>([]);
   const [role, setRole] = useState("");
   const [whenField, setWhenField] = useState("");
   const [whenValue, setWhenValue] = useState("");
@@ -98,6 +130,7 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
   const [routeWhen, setRouteWhen] = useState("");
   const [routeValue, setRouteValue] = useState("");
   const label = (k: string) => stages.find((s) => s.key === k)?.label ?? k;
+  const chosenField = fields.find((f) => f.key === fieldKey);
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
     start(async () => {
@@ -133,7 +166,7 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
             {kind === "field" && (
               <div>
                 <label className="label" htmlFor={`${stage.key}-field`}>Which field</label>
-                <select id={`${stage.key}-field`} className="input" value={fieldKey} onChange={(e) => setFieldKey(e.target.value)}>
+                <select id={`${stage.key}-field`} className="input" value={fieldKey} onChange={(e) => { setFieldKey(e.target.value); setMustBe([]); }}>
                   <option value="">Choose a field</option>
                   {fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
                 </select>
@@ -149,11 +182,25 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
               </div>
             )}
           </div>
+          {kind === "field" && chosenField && conditionable(chosenField) && (
+            <fieldset>
+              <legend className="label">Counts only if the answer is (optional)</legend>
+              <p className="mb-1 text-xs text-muted">Leave all unticked and any answer counts. Tick Yes to make &ldquo;No&rdquo; hold the deal back.</p>
+              <div className="flex max-h-40 flex-wrap gap-x-4 gap-y-1 overflow-y-auto rounded-md border border-line p-2">
+                {answersOf(chosenField).map((a) => (
+                  <label key={a} className="flex items-center gap-1.5 text-sm">
+                    <input type="checkbox" checked={mustBe.includes(a)} onChange={(e) => setMustBe((m) => (e.target.checked ? [...m, a] : m.filter((x) => x !== a)))} />
+                    {a}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <ConditionPicker idPrefix={`${stage.key}-req`} fields={fields} field={whenField} value={whenValue} onField={setWhenField} onValue={setWhenValue} />
           <button
             className="btn-dark"
             disabled={pending || (kind === "field" && !fieldKey) || (!!whenField && !whenValue)}
-            onClick={() => run(() => addRequirementAction({ stageKey: stage.key, kind, fieldKey, contactRole: role, whenField, whenValue }), () => { setFieldKey(""); setWhenField(""); setWhenValue(""); })}
+            onClick={() => run(() => addRequirementAction({ stageKey: stage.key, kind, fieldKey, contactRole: role, whenField, whenValue, requiredValues: kind === "field" ? mustBe : [] }), () => { setFieldKey(""); setMustBe([]); setWhenField(""); setWhenValue(""); })}
           >
             Add requirement
           </button>

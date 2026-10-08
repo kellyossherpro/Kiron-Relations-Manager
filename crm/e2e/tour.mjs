@@ -55,11 +55,13 @@ await sam.goto(bluebay);
 await shot(sam, "deal");
 await part(sam, "section[aria-label=Activity]", "activity");
 await sam.click("section[aria-label=Details] >> text=Edit");
-await sam.selectOption("#f-p\\.lead_source", "Event");
+await sam.fill("#f-p\\.lead_source", "SBC");
+await sam.click("li[role=option] >> text=SBC Barcelona");
 await sam.fill("#f-amountMonthly", "28000");
 await part(sam, "section[aria-label=Details]", "deal-editing");
 await sam.click("text=Save changes");
 await sam.waitForSelector("text=so the deal moved on");
+await sam.evaluate(() => window.scrollTo(0, 0));
 await shot(sam, "deal-moved");
 
 step("two people, same field");
@@ -132,7 +134,7 @@ step("admin");
 const admin = await as("Admin Example");
 await admin.goto(`${B}/admin`);
 await shot(admin, "admin");
-await admin.click("button:has-text('3. Qualified Lead')");
+await admin.click("button:has-text('5. Proposal')");
 await part(admin, "section[aria-label='Stage rules']", "stage-rules");
 
 step("phone");

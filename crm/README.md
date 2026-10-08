@@ -28,6 +28,7 @@ npm run dev                   # http://localhost:3000 → "Set up KRM"
 | `npm run example:load` | Fills an **empty** database with a made-up example company (people, deals, rules) for demos. Refuses if there's any data |
 | `npm run example:clear` | Empties it again. Refuses if anyone in it isn't an `@example.test` person |
 | `node e2e/tour.mjs` | With example data loaded and the app running: takes the screenshots for the KRM tour |
+| `node e2e/playbook.mjs` | On an empty database with the app running: the "Set up the playbook's rules" button |
 | `npm run rules:daily` | Runs the daily rules by hand (30-day reminders, 60-day On Hold, 60 days On Hold → Closed Lost) |
 
 ## How it's built
@@ -41,6 +42,8 @@ src/lib/fields.ts       built-in fields + admin-defined fields, value checking
 src/lib/stage-engine.ts what each stage needs, auto-advance, daily 30/60-day rules
 src/lib/stage-rules-admin.ts  admin edits to stage rules; notifications
 src/lib/addendums.ts    the addendum loop: raise on a live deal, mark done or cancel, back to Live
+src/lib/kiron-pipeline.ts  the sales playbook as fields + stage rules (Admin → "Set up the playbook's rules")
+src/lib/conditions.ts   answer matching shared by stage rules and forms ("only show when")
 src/lib/links.ts        contacts↔companies, deal contacts with roles, collaborators
 src/lib/activities.ts   notes, calls, meetings, tasks
 src/lib/admin.ts        first admin, people, field definitions
@@ -66,6 +69,10 @@ Rules that matter:
   cancelling it sends the deal back to the Live stage it came from. Each addendum is its own row in
   `addendums`, so nothing on the deal is reset and past addendums stay listed. The Addendum stage can't be
   picked in "Move deal" or used in stage rules; moving a deal out of it by hand cancels the open addendum.
+- **Kiron's pipeline** (`kiron-pipeline.ts`) mirrors the sales playbook stage by stage, with HubSpot's field
+  names and dropdown options. A requirement can need specific answers ("Technical review performed is Yes");
+  a field can be shown only for certain answers of another ("Server name" only when "Dedicated server" is
+  Yes). Deal sections for stages not reached yet fold under "Later stages". Lists over 12 options are searched.
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.
 - **Sign-in** is a development picker (`AUTH_MODE=dev`). Microsoft sign-in replaces it before go-live.
 

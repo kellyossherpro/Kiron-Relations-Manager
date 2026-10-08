@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { FIELD_TYPES, OBJECT_TYPES, ROLES, type FieldType, type ObjectType, type Role } from "@/db/schema";
+import type { ShowWhen } from "./conditions";
 import { PermissionError, RuleError, translateDbError } from "./errors";
+import { fieldsFor, PROP_PREFIX } from "./fields";
 import { canManageUsersAndFields, type Actor } from "./permissions";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -68,7 +70,22 @@ export type FieldDefinitionInput = {
   options?: string[];
   groupLabel?: string | null;
   extraEditorRoles?: string[];
+  showWhen?: ShowWhen | null;
 };
+
+// "Only show when <field> is <answer>": the other field must be one with set answers.
+async function cleanShowWhen(objectType: ObjectType, ownKey: string, showWhen: ShowWhen | null | undefined): Promise<ShowWhen | null> {
+  if (!showWhen?.field) return null;
+  const values = [...new Set(showWhen.values.map((v) => v.trim()).filter(Boolean))];
+  if (showWhen.field === PROP_PREFIX + ownKey) throw new RuleError("A field can't depend on itself.");
+  const defs = await db.execute(sql`select key, label, type, options, archived from property_definitions where object_type = ${objectType}`);
+  const other = fieldsFor(objectType, defs.rows as never).find((f) => f.key === showWhen.field);
+  if (!other || !["select", "multiselect", "yesno"].includes(other.type)) throw new RuleError("Pick a dropdown or yes/no field for \"only show when\".");
+  const answers = other.type === "yesno" ? ["Yes", "No"] : (other.options ?? []);
+  if (!values.length) throw new RuleError(`Tick the answers of ${other.label} that make this field show.`);
+  if (!values.every((v) => answers.includes(v))) throw new RuleError(`Pick the answers from ${other.label}'s options.`);
+  return { field: other.key, values };
+}
 
 function cleanOptions(type: FieldType, options: string[] | undefined) {
   const opts = [...new Set((options ?? []).map((o) => o.trim()).filter(Boolean))];
@@ -85,12 +102,13 @@ export async function createFieldDefinition(actor: Actor, input: FieldDefinition
   if (!key) throw new RuleError("Give the field a name.");
   const options = cleanOptions(input.type, input.options);
   const roles = (input.extraEditorRoles ?? []).filter((r) => (ROLES as readonly string[]).includes(r));
+  const showWhen = await cleanShowWhen(input.objectType, key, input.showWhen);
   try {
     const pos = await db.execute(sql`select coalesce(max(position), 0) + 1 as p from property_definitions where object_type = ${input.objectType}`);
     const res = await db.execute(sql`
-      insert into property_definitions (object_type, key, label, type, options, group_label, position, extra_editor_roles)
+      insert into property_definitions (object_type, key, label, type, options, group_label, position, extra_editor_roles, show_when)
       values (${input.objectType}, ${key}, ${label}, ${input.type}, ${JSON.stringify(options)}::jsonb, ${input.groupLabel?.trim() || null},
-              ${pos.rows[0].p as number}, ${JSON.stringify(roles)}::jsonb)
+              ${pos.rows[0].p as number}, ${JSON.stringify(roles)}::jsonb, ${showWhen ? JSON.stringify(showWhen) : null}::jsonb)
       returning id`);
     return res.rows[0].id as string;
   } catch (err) {
@@ -102,12 +120,13 @@ export async function createFieldDefinition(actor: Actor, input: FieldDefinition
 export async function updateFieldDefinition(
   actor: Actor,
   id: string,
-  input: { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; archived?: boolean },
+  input: { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: ShowWhen | null; archived?: boolean },
 ) {
   if (!canManageUsersAndFields(actor)) throw new PermissionError("Only an admin can change fields.");
-  const cur = await db.execute(sql`select type from property_definitions where id = ${id}`);
+  const cur = await db.execute(sql`select type, object_type, key from property_definitions where id = ${id}`);
   if (!cur.rows[0]) throw new RuleError("That field doesn't exist.");
   const type = cur.rows[0].type as FieldType;
+  const showWhen = input.showWhen !== undefined ? await cleanShowWhen(cur.rows[0].object_type as ObjectType, cur.rows[0].key as string, input.showWhen) : undefined;
   const label = input.label?.trim();
   if (input.label !== undefined && !label) throw new RuleError("Give the field a name.");
   const options = input.options !== undefined ? cleanOptions(type, input.options) : undefined;
@@ -118,6 +137,7 @@ export async function updateFieldDefinition(
       options = coalesce(${options ? JSON.stringify(options) : null}::jsonb, options),
       group_label = ${input.groupLabel !== undefined ? sql`${input.groupLabel?.trim() || null}` : sql`group_label`},
       extra_editor_roles = coalesce(${roles ? JSON.stringify(roles) : null}::jsonb, extra_editor_roles),
+      show_when = ${showWhen !== undefined ? sql`${showWhen ? JSON.stringify(showWhen) : null}::jsonb` : sql`show_when`},
       archived = coalesce(${input.archived ?? null}, archived),
       updated_at = now()
     where id = ${id}`);

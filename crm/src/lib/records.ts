@@ -17,7 +17,7 @@ export type SaveResult = { status: "saved"; version: number; movedTo?: string[] 
 
 async function loadSpecs(tx: Tx | typeof db, objectType: ObjectType) {
   const res = await tx.execute(sql`
-    select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", archived
+    select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", archived
     from property_definitions where object_type = ${objectType}`);
   return fieldsFor(objectType, res.rows as never);
 }

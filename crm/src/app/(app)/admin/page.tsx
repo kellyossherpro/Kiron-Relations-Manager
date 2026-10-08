@@ -1,5 +1,6 @@
 import { AdminFields } from "@/components/admin-fields";
 import { AdminStageRules } from "@/components/admin-stage-rules";
+import { kironPipelineSummary } from "@/lib/kiron-pipeline";
 import { conditionText, loadPipelineConfig, requirementLabel } from "@/lib/stage-engine";
 import { db } from "@/db";
 import { AdminUsers } from "@/components/admin-users";
@@ -19,6 +20,7 @@ export default async function AdminPage() {
       <AdminUsers users={users} meId={actor.id} />
       <AdminFields defs={defs} />
       <AdminStageRules
+        playbook={kironPipelineSummary()}
         stages={cfg.stages}
         fields={cfg.fields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))}
         requirements={cfg.requirements.map((r) => ({ id: r.id, stageKey: r.stageKey, label: requirementLabel(cfg, r) }))}

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { saveRecordAction } from "@/app/actions";
 import type { ObjectType } from "@/db/schema";
+import { isShown } from "@/lib/conditions";
 import type { Conflict } from "@/lib/records";
 import { FieldInput, FieldValue, type ClientField, type Lookups } from "./field-input";
 
@@ -27,12 +28,14 @@ export function RecordFields({
   fields,
   values,
   lookups,
+  laterGroups = [],
 }: {
   objectType: ObjectType;
   recordId: string;
   fields: ClientField[];
   values: Record<string, unknown>;
   lookups: Lookups;
+  laterGroups?: string[]; // sections for stages the deal hasn't reached: folded away
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -44,16 +47,20 @@ export function RecordFields({
   const [pending, start] = useTransition();
 
   const canEdit = fields.some((f) => f.editable);
+  // Fields that only apply for certain answers follow what's on screen right now.
+  const current = editing ? draft : values;
   const groups = useMemo(() => {
     const out: { name: string | null; fields: ClientField[] }[] = [];
-    for (const f of fields) {
+    for (const f of fields.filter((x) => isShown(x, current))) {
       const name = f.group ?? null;
       let g = out.find((x) => x.name === name);
       if (!g) out.push((g = { name, fields: [] }));
       g.fields.push(f);
     }
     return out;
-  }, [fields]);
+  }, [fields, current]);
+  const now = groups.filter((g) => !g.name || !laterGroups.includes(g.name));
+  const later = groups.filter((g) => g.name && laterGroups.includes(g.name));
 
   function beginEdit() {
     setDraft(values);
@@ -104,6 +111,34 @@ export function RecordFields({
 
   const fieldOf = (key: string) => fields.find((f) => f.key === key)!;
 
+  function renderGroup(g: { name: string | null; fields: ClientField[] }) {
+    return (
+      <div key={g.name ?? "_main"}>
+        {g.name && <h3 className="mb-3 border-b border-line pb-1 text-xs font-black tracking-wider text-muted uppercase">{g.name}</h3>}
+        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+          {g.fields.map((f) => (
+            <div key={f.key} className="min-w-0">
+              <dt>
+                <label className="label" htmlFor={`f-${f.key}`}>
+                  {f.label}
+                  {f.required && editing && " *"}
+                </label>
+              </dt>
+              <dd className="text-sm">
+                {editing && f.editable ? (
+                  <FieldInput field={f} value={draft[f.key]} onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))} lookups={lookups} invalid={error?.field === f.key} />
+                ) : (
+                  <FieldValue field={f} value={values[f.key]} lookups={lookups} />
+                )}
+                {error?.field === f.key && <p className="mt-1 text-xs text-danger">{error.message}</p>}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    );
+  }
+
   return (
     <section className="card p-5" aria-label="Details">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -139,32 +174,17 @@ export function RecordFields({
       )}
 
       <div className="space-y-6">
-        {groups.map((g) => (
-          <div key={g.name ?? "_main"}>
-            {g.name && <h3 className="mb-3 border-b border-line pb-1 text-xs font-black tracking-wider text-muted uppercase">{g.name}</h3>}
-            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              {g.fields.map((f) => (
-                <div key={f.key} className="min-w-0">
-                  <dt>
-                    <label className="label" htmlFor={`f-${f.key}`}>
-                      {f.label}
-                      {f.required && editing && " *"}
-                    </label>
-                  </dt>
-                  <dd className="text-sm">
-                    {editing && f.editable ? (
-                      <FieldInput field={f} value={draft[f.key]} onChange={(v) => setDraft((d) => ({ ...d, [f.key]: v }))} lookups={lookups} invalid={error?.field === f.key} />
-                    ) : (
-                      <FieldValue field={f} value={values[f.key]} lookups={lookups} />
-                    )}
-                    {error?.field === f.key && <p className="mt-1 text-xs text-danger">{error.message}</p>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ))}
+        {now.map((g) => renderGroup(g))}
+        {later.length > 0 && (
+          <details className="rounded-lg border border-line px-4 py-3">
+            <summary className="cursor-pointer text-sm font-bold">
+              Later stages <span className="font-normal text-muted">· {later.map((g) => g.name).join(", ")}</span>
+            </summary>
+            <div className="mt-4 space-y-6">{later.map((g) => renderGroup(g))}</div>
+          </details>
+        )}
       </div>
+
 
       {editing && (
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-4">

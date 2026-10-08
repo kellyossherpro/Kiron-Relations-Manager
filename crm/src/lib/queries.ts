@@ -34,7 +34,7 @@ export async function contactOptions(): Promise<Option[]> {
 export async function listDefinitions(objectType?: ObjectType, includeArchived = false) {
   const res = await db.execute(sql`
     select id, object_type as "objectType", key, label, type, options, group_label as "groupLabel",
-           extra_editor_roles as "extraEditorRoles", archived, position
+           extra_editor_roles as "extraEditorRoles", show_when as "showWhen", archived, position
     from property_definitions
     where true ${objectType ? sql`and object_type = ${objectType}` : sql``} ${includeArchived ? sql`` : sql`and not archived`}
     order by object_type, position`);

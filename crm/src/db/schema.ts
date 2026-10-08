@@ -173,6 +173,9 @@ export const propertyDefinitions = pgTable(
     position: integer("position").notNull().default(0),
     // Roles that may edit this field even when they don't own the record (e.g. "legal").
     extraEditorRoles: jsonb("extra_editor_roles").$type<string[]>().notNull().default([]),
+    // Only show the field when another field has one of these answers (e.g. "Server name"
+    // only when "Dedicated server" is Yes). Null = always shown.
+    showWhen: jsonb("show_when").$type<{ field: string; values: string[] }>(),
     archived: boolean("archived").notNull().default(false),
     ...timestamps,
   },
@@ -229,7 +232,8 @@ export const auditLog = pgTable(
 // ---------- stage rules ----------
 
 // What a deal needs before it can leave a stage. `kind`:
-// - field: the field (built-in key or "p.<key>") must be filled in
+// - field: the field (built-in key or "p.<key>") must be filled in, or have one of
+//   `required_values` (e.g. "Technical review performed" must be Yes)
 // - has_contact: at least one contact on the deal (optionally with a given role)
 // - has_primary_company: the contracting company is set
 // - has_collaborator: at least one collaborator
@@ -247,6 +251,8 @@ export const stageRequirements = pgTable(
     contactRole: text("contact_role"),
     whenField: text("when_field"),
     whenValue: text("when_value"),
+    // For kind "field": the answers that count (e.g. ["Yes"]). Empty = any answer counts.
+    requiredValues: jsonb("required_values").$type<string[]>(),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

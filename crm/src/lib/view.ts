@@ -13,6 +13,7 @@ export function clientFields(actor: Actor, objectType: ObjectType, ownerId: stri
     options: s.options,
     required: s.required,
     group: s.group,
+    showWhen: s.showWhen ?? null,
     editable: canEditField(actor, objectType, { ownerId }, s, { collaboratorIds }),
   }));
 }

@@ -48,6 +48,13 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   const lookups = { companies, users: userOptions };
   const stage = stages.find((s) => s.key === row.stage_key);
   const stageLabels = Object.fromEntries(stages.map((s) => [s.key, s.label]));
+  // Sections named after a stage the deal hasn't reached yet ("Proposal", "Qualified Lead: fees & rates")
+  // are folded away while it's still being sold.
+  const selling = stage && ["open", "won"].includes(stage.kind);
+  const ahead = selling ? stages.filter((s) => ["open", "won"].includes(s.kind) && s.position > stage.position) : [];
+  const laterGroups = [...new Set(specs.map((f) => f.group).filter((g): g is string => !!g))].filter((g) =>
+    ahead.some((s) => g === s.label || g.startsWith(`${s.label}:`)),
+  );
   const showAddendums = stage?.kind === "live" || stage?.kind === "change" || addendums.length > 0;
   const names = Object.fromEntries([...userOptions, ...companies].map((o) => [o.id, o.label]));
 
@@ -78,7 +85,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               items={addendums.map((a) => ({ ...a, raisedAt: String(a.raisedAt), closedAt: a.closedAt ? String(a.closedAt) : null }))}
             />
           )}
-          <RecordFields objectType="deal" recordId={id} fields={clientFields(actor, "deal", ownerId, specs, collabIds)} values={values} lookups={lookups} />
+          <RecordFields objectType="deal" recordId={id} fields={clientFields(actor, "deal", ownerId, specs, collabIds)} values={values} lookups={lookups} laterGroups={laterGroups} />
           <ActivityPanel parent={{ dealId: id }} items={activities} users={userOptions} me={{ id: actor.id, isAdmin: isManager(actor) }} canLog={canLogActivity(actor)} />
         </div>
 

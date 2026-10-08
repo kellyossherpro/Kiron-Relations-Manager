@@ -22,6 +22,7 @@ import {
 import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord, type SaveResult } from "@/lib/records";
 import { requireActor, signInAs, signOut } from "@/lib/session";
 import { GATE_COOKIE, gateToken, passwordMatches, safeNext } from "@/lib/site-gate";
+import { applyKironPipeline } from "@/lib/kiron-pipeline";
 import { addRequirement, addTransition, markAllRead, removeRequirement, removeTransition, type RequirementInput } from "@/lib/stage-rules-admin";
 
 // Every action checks who is signed in, then calls the same tested functions the
@@ -259,6 +260,7 @@ export async function createFieldAction(input: {
   options?: string[];
   groupLabel?: string;
   extraEditorRoles?: string[];
+  showWhen?: { field: string; values: string[] } | null;
 }): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => createFieldDefinition(actor, input));
@@ -268,7 +270,7 @@ export async function createFieldAction(input: {
 
 export async function updateFieldAction(
   id: string,
-  input: { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; archived?: boolean },
+  input: { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: { field: string; values: string[] } | null; archived?: boolean },
 ): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => updateFieldDefinition(actor, id, input));
@@ -302,6 +304,15 @@ export async function addTransitionAction(input: { fromStage: string; toStage: s
 export async function removeTransitionAction(id: string): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => removeTransition(actor, id));
+  refresh();
+  return res;
+}
+
+export async function applyKironPipelineAction(): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(async () => {
+    await applyKironPipeline(actor);
+  });
   refresh();
   return res;
 }

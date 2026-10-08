@@ -1,7 +1,10 @@
 import { sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import type { RequirementKind } from "@/db/schema";
+import { valueMatches } from "./conditions";
 import { fieldsFor, readFieldValue, type FieldSpec } from "./fields";
+
+export { valueMatches };
 import { DEAL_CONTACT_ROLE_LABEL } from "./format";
 
 // ============================================================================
@@ -18,6 +21,7 @@ export type Requirement = {
   contactRole: string | null;
   whenField: string | null;
   whenValue: string | null;
+  requiredValues?: string[] | null;
   position: number;
 };
 export type Transition = { id: string; fromStage: string; toStage: string; whenField: string | null; whenValue: string | null; position: number };
@@ -51,15 +55,6 @@ function isFilled(v: unknown) {
   return true; // includes false for a Yes/No field: "No" is an answer
 }
 
-// "Integration type is Custom", "Via aggregator is yes", multi-choice "includes".
-export function valueMatches(v: unknown, expected: string) {
-  const want = expected.trim().toLowerCase();
-  if (v === null || v === undefined) return false;
-  if (typeof v === "boolean") return (v ? "yes" : "no") === want;
-  if (Array.isArray(v)) return v.some((x) => String(x).trim().toLowerCase() === want);
-  return String(v).trim().toLowerCase() === want;
-}
-
 export function conditionText(cfg: PipelineConfig, whenField: string | null, whenValue: string | null) {
   if (!whenField) return "";
   const label = cfg.fields.find((f) => f.key === whenField)?.label ?? "a hidden field";
@@ -68,7 +63,10 @@ export function conditionText(cfg: PipelineConfig, whenField: string | null, whe
 
 export function requirementLabel(cfg: PipelineConfig, r: Requirement) {
   let base: string;
-  if (r.kind === "field") base = cfg.fields.find((f) => f.key === r.fieldKey)?.label ?? "A hidden field";
+  if (r.kind === "field") {
+    base = cfg.fields.find((f) => f.key === r.fieldKey)?.label ?? "A hidden field";
+    if (r.requiredValues?.length) base += ` is ${r.requiredValues.join(" or ")}`;
+  }
   else if (r.kind === "has_contact") base = r.contactRole ? `${DEAL_CONTACT_ROLE_LABEL[r.contactRole] ?? r.contactRole} contact added` : "A contact added";
   else if (r.kind === "has_primary_company") base = "Contracting company set";
   else base = "A collaborator added";
@@ -92,7 +90,10 @@ export function evaluate(deal: DealSnapshot, cfg: PipelineConfig): Evaluation {
 
   const checked = reqs.map<CheckedRequirement>((r) => {
     let met: boolean;
-    if (r.kind === "field") met = isFilled(deal.values[r.fieldKey!]);
+    if (r.kind === "field") {
+      const v = deal.values[r.fieldKey!];
+      met = r.requiredValues?.length ? r.requiredValues.some((want) => valueMatches(v, want)) : isFilled(v);
+    }
     else if (r.kind === "has_contact") met = r.contactRole ? deal.contactRoles.includes(r.contactRole) : deal.contactRoles.length > 0;
     else if (r.kind === "has_primary_company") met = deal.hasPrimaryCompany;
     else met = deal.collaboratorCount > 0;
@@ -119,13 +120,13 @@ export async function loadPipelineConfig(q: Q): Promise<PipelineConfig> {
     q.execute(sql`select key, label, kind, position from pipeline_stages order by position`),
     q.execute(sql`
       select id, stage_key as "stageKey", kind, field_key as "fieldKey", contact_role as "contactRole",
-             when_field as "whenField", when_value as "whenValue", position
+             when_field as "whenField", when_value as "whenValue", required_values as "requiredValues", position
       from stage_requirements order by stage_key, position, created_at`),
     q.execute(sql`
       select id, from_stage as "fromStage", to_stage as "toStage", when_field as "whenField", when_value as "whenValue", position
       from stage_transitions order by from_stage, position, created_at`),
     q.execute(sql`
-      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", archived
+      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", archived
       from property_definitions where object_type = 'deal'`),
   ]);
   return {

@@ -36,6 +36,20 @@
       "when": 1791393817722,
       "tag": "0004_addendums",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791445305864,
+      "tag": "0005_required_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791445718974,
+      "tag": "0006_show_when",
+      "breakpoints": true
     }
   ]
 }
