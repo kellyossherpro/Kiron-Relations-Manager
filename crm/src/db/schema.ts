@@ -36,6 +36,9 @@ const recordColumns = {
   createdBy: uuid("created_by").references(() => users.id),
   ...timestamps,
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  // Brought in from HubSpot: its Record ID (so a later import updates instead of duplicating) and the run.
+  hubspotId: text("hubspot_id"),
+  importId: uuid("import_id").references((): AnyPgColumn => imports.id),
 };
 
 export const users = pgTable(
@@ -67,6 +70,7 @@ export const companies = pgTable(
   },
   (t) => [
     uniqueIndex("companies_name_unique").on(sql`lower(${t.name})`).where(sql`${t.deletedAt} is null`),
+    uniqueIndex("companies_hubspot_unique").on(t.hubspotId).where(sql`${t.deletedAt} is null and ${t.hubspotId} is not null`),
     check("companies_website_required_online", sql`${t.companyType} is null or ${t.companyType} = 'retail' or ${t.website} is not null`),
   ],
 );
@@ -83,6 +87,7 @@ export const contacts = pgTable(
   },
   (t) => [
     uniqueIndex("contacts_email_unique").on(sql`lower(${t.email})`).where(sql`${t.deletedAt} is null and ${t.email} is not null`),
+    uniqueIndex("contacts_hubspot_unique").on(t.hubspotId).where(sql`${t.deletedAt} is null and ${t.hubspotId} is not null`),
     check("contacts_email_or_phone", sql`${t.email} is not null or ${t.phone} is not null`),
   ],
 );
@@ -120,7 +125,11 @@ export const deals = pgTable(
     primaryCompanyId: uuid("primary_company_id").references(() => companies.id),
     viaAggregatorId: uuid("via_aggregator_id").references(() => companies.id),
   },
-  (t) => [index("deals_stage_idx").on(t.stageKey), index("deals_owner_idx").on(t.ownerId)],
+  (t) => [
+    index("deals_stage_idx").on(t.stageKey),
+    index("deals_owner_idx").on(t.ownerId),
+    uniqueIndex("deals_hubspot_unique").on(t.hubspotId).where(sql`${t.deletedAt} is null and ${t.hubspotId} is not null`),
+  ],
 );
 
 // Other companies on a deal (the primary/contracting company lives on the deal itself).
@@ -427,3 +436,17 @@ export const fileDownloads = pgTable(
   },
   (t) => [index("file_downloads_file_idx").on(t.fileId, t.at)],
 );
+
+// One run of "Bring in from HubSpot": what file, what it did, and whether it was undone.
+export const imports = pgTable("imports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  objectType: text("object_type").$type<"company" | "contact" | "deal">().notNull(),
+  fileName: text("file_name").notNull(),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  created: integer("created").notNull().default(0),
+  updated: integer("updated").notNull().default(0),
+  skipped: integer("skipped").notNull().default(0),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  undoneAt: timestamp("undone_at", { withTimezone: true }),
+});

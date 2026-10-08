@@ -9,6 +9,7 @@ and keep everything "idiot-proof, as simple as possible" (her design principle).
 - Live questions page (decisions with Kelly): https://claude.ai/artifact/9PQyT2yfhPTMQktv1rsphb
   (data layout described in `README.md`).
 - Business case deck: https://claude.ai/artifact/EGVz8tf1ngU2p9K4w33L2a
+- Microsoft sign-in request for IT (Kelly forwards it): https://claude.ai/code/artifact/eafdf14f-baa8-4f75-8240-9ed9e6a2782d
 - `crm/` — the app. Read `crm/README.md` first, and `crm/AGENTS.md` (this Next.js version differs from
   older ones; check `crm/node_modules/next/dist/docs/` before using a Next API).
 - Pipeline source of truth: the sales playbook in the `kiron-sales-playbook` repo, not `sales_pipeline_process.docx`.

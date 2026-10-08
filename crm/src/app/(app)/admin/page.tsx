@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AdminDealButtons } from "@/components/admin-deal-buttons";
 import { AdminFields } from "@/components/admin-fields";
 import { AdminStageRules } from "@/components/admin-stage-rules";
@@ -24,7 +25,10 @@ export default async function AdminPage() {
   ]);
   return (
     <div className="space-y-5">
-      <h1 className="h1">Admin</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="h1">Admin</h1>
+        <Link href="/admin/import" className="btn-dark">Bring in from HubSpot</Link>
+      </div>
       <AdminUsers users={users.map((u) => ({ ...u, teams: teamNames[u.id] ?? [] }))} meId={actor.id} />
       <AdminTeams teams={teams} kironSetUp={kironSetUp} people={users.filter((u) => u.active).map((u) => ({ id: u.id, label: u.title ? `${u.name} · ${u.title}` : u.name }))} />
       <AdminGoLive slots={GO_LIVE_TEAM_SLOTS.map((s) => ({ slot: s.slot, label: s.label, teamId: goLive[s.slot] }))} teams={teams.map((t) => ({ id: t.id, name: t.name }))} />

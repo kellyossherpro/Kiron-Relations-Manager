@@ -42,6 +42,9 @@ export function HistoryList({ entries, labels, stageLabels, names = {}, moneyFie
           ) : (
             <>Undid the <strong>{which}</strong> go-live handover</>
           );
+        } else if (e.action === "import") {
+          const nv = e.newValue as { hubspotId?: string | null; outcome?: string };
+          text = <>{nv.outcome === "updated" ? "Updated from HubSpot" : "Brought in from HubSpot"}{nv.hubspotId && <span className="text-muted"> · Record ID {nv.hubspotId}</span>}</>;
         } else if (e.action === "file") {
           // The file's name isn't shown: not everyone who reads the history may open the file.
           const nv = e.newValue as { category: string; added: boolean };

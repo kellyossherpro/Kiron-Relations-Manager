@@ -49,6 +49,7 @@ src/lib/settings.ts     company-wide settings (buttons on deals)
 src/lib/teams.ts        departments and groups; "Set up Kiron's people" (from kiron-org.ts)
 src/lib/kiron-org.ts    Kiron's departments, people, job titles (organogram; never emails or phones)
 src/lib/view.ts         what a page may show this person (fields, values, history)
+src/lib/import/          "Bring in from HubSpot": parse.ts (CSV/.xlsx, in the browser), plan.ts (column matching), run.ts
 src/lib/files.ts        files on deals and companies: add, who can open, download log (bytes: storage.ts)
 src/lib/go-live.ts      go-live handovers: confirm/undo, who confirms, Live board data (rules in go-live-checks.ts)
 src/lib/links.ts        contacts↔companies, deal contacts with roles, collaborators
@@ -97,6 +98,14 @@ Rules that matter:
   it moves to Live by itself. When everything else for the stage is in, each department is notified once and
   the deal shows on their My tasks. Confirmations can be undone until the deal goes Live. `/live` is the
   Live board: going-live deals with each handover's status, and every live client; it refreshes every 30 s.
+- **Bring in from HubSpot** (Admin → Bring in from HubSpot, admins only): companies, then contacts, then deals.
+  The browser reads HubSpot's export (.xlsx or .csv) and suggests where each column goes (KRM's usual names, then
+  fields with the same label, then what was picked last time); deal stages are matched by name. "Check first" runs
+  everything and rolls it back, listing each problem (downloadable as CSV); "Bring in" does it for real in chunks.
+  Each row is its own savepoint: a bad row is skipped, a bad cell is left empty, and both are reported. Records keep
+  `hubspot_id`, so a second run updates them (empty cells leave KRM's value alone) instead of duplicating; `import_id`
+  marks what a run created, and Undo soft-deletes those. Imports never move stages, hand deals over or notify.
+  Owners are matched by name or email; companies by HubSpot Record ID or name; contacts on deals by ID or email.
 - **Files** (`files`, `file_downloads`): on deals and companies; Proposal, RICE report, Contract or Other; PDF,
   Office files, images, up to 50 MB. Each file is open to everyone, to people who see fees and rates (the
   default for proposals and contracts), or to chosen departments; the uploader and admins always can. Files

@@ -23,6 +23,8 @@ import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord,
 import { requireActor, signInAs, signOut } from "@/lib/session";
 import { GATE_COOKIE, gateToken, passwordMatches, safeNext } from "@/lib/site-gate";
 import { applyKironPipeline } from "@/lib/kiron-pipeline";
+import { finishImport, importChunk, startImport, undoImport, type ChunkInput, type RowResult } from "@/lib/import/run";
+import type { ImportObject, Target } from "@/lib/import/plan";
 import { deleteFile, finishUpload, startUpload, type StartUpload } from "@/lib/files";
 import type { UploadTarget } from "@/lib/storage";
 import { confirmGoLive, setGoLiveTeams, undoGoLive, type GoLiveTeams } from "@/lib/go-live";
@@ -285,6 +287,38 @@ export async function updateFieldAction(
 ): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => updateFieldDefinition(actor, id, input));
+  refresh();
+  return res;
+}
+
+// ---------- import from HubSpot ----------
+
+export async function startImportAction(input: { objectType: ImportObject; fileName: string }): Promise<ActionResult> {
+  const actor = await requireActor();
+  return attempt(() => startImport(actor, input));
+}
+
+export async function importChunkAction(input: ChunkInput): Promise<{ ok: true; results: RowResult[] } | { ok: false; error: string }> {
+  const actor = await requireActor();
+  let results: RowResult[] = [];
+  const res = await attempt(async () => {
+    results = await importChunk(actor, input);
+  });
+  return res.ok ? { ok: true, results } : res;
+}
+
+export async function finishImportAction(importId: string, objectType: ImportObject, headers: string[], mapping: Target[]): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => finishImport(actor, importId, objectType, headers, mapping));
+  refresh();
+  return res;
+}
+
+export async function undoImportAction(importId: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(async () => {
+    await undoImport(actor, importId);
+  });
   refresh();
   return res;
 }
