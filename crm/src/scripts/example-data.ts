@@ -28,7 +28,7 @@ export async function clearExampleData() {
   const real = await db.execute(sql`select count(*)::int as n from users where email not like '%@example.test'`);
   if ((real.rows[0].n as number) > 0) throw new Error("This database has people who aren't example users. Not clearing it.");
   await db.execute(sql`truncate addendums, notifications, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
-  await db.execute(sql`delete from stage_requirements`);
+  await db.execute(sql`delete from stage_requirements; delete from app_settings`);
   await db.execute(sql`delete from stage_transitions`);
   await db.execute(sql`
     insert into stage_transitions (from_stage, to_stage, position) values
