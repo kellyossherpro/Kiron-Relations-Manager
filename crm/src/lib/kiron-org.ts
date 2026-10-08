@@ -1,9 +1,9 @@
 // Kiron's departments and people, from the organogram Kelly shared on 2026-10-08. Names, job titles
 // and who each person reports to only: never email addresses or phone numbers (CLAUDE.md).
 // People are matched to their Microsoft account when they first sign in.
-// Still to come: Sales, Account Management, Finance, Legal, Compliance, Marketing, management.
+// Still to come: PMO (3 people, cut off in the screenshot).
 
-export type OrgPerson = { name: string; title: string; reportsTo: string };
+export type OrgPerson = { name: string; title: string; reportsTo?: string };
 export type OrgDepartment = { name: string; people: OrgPerson[] };
 
 export const KIRON_ORG: OrgDepartment[] = [
@@ -119,6 +119,101 @@ export const KIRON_ORG: OrgDepartment[] = [
       { name: "Jamila Yeki", title: "People & Culture Administrator", reportsTo: "Prashika Murugan" },
       { name: "Kate Dawes", title: "Learning & Development Officer", reportsTo: "Prashika Murugan" },
       { name: "Prashika Murugan", title: "Head of People & Culture", reportsTo: "Steven Spartinos" },
+    ],
+  },
+  {
+    name: "QA",
+    people: [
+      { name: "Carl Dittmer", title: "QA Manager", reportsTo: "Justin Frost" },
+      { name: "Caron Audrey Hewitt", title: "Software Tester", reportsTo: "Carl Dittmer" },
+      { name: "Ivy Rabetsoe Mokoena", title: "Intermediate Software Tester", reportsTo: "Carl Dittmer" },
+      { name: "Ruvona Pillay", title: "Intermediate Software Tester", reportsTo: "Carl Dittmer" },
+      { name: "Sandra Tsoka", title: "Software Tester", reportsTo: "Carl Dittmer" },
+      { name: "Temoso Hlase", title: "Senior QA tester", reportsTo: "Carl Dittmer" },
+      { name: "Tina Groenewald", title: "Senior Software Tester", reportsTo: "Carl Dittmer" },
+      { name: "Tsholofelo Mokwena", title: "Senior Software Tester", reportsTo: "Carl Dittmer" },
+    ],
+  },
+  {
+    name: "Account Management",
+    people: [
+      { name: "Dani Alves", title: "Account Manager", reportsTo: "Sarah Cranston" },
+      { name: "Dieg Mabamvu", title: "Head of Account Management - Africa", reportsTo: "Sarah Cranston" },
+      { name: "Giuseppe Donato", title: "Account Manager", reportsTo: "Sarah Cranston" },
+      { name: "Kelly Ossher", title: "Account Management Support Administrator", reportsTo: "Dieg Mabamvu" },
+      { name: "Sarah Cranston", title: "Global Head of Account Management", reportsTo: "Feron Lee Somiah" },
+      { name: "Tom Maneno", title: "Account Manager", reportsTo: "Dieg Mabamvu" },
+      { name: "Tony Maboya", title: "Account Manager", reportsTo: "Dieg Mabamvu" },
+      { name: "Valentina Francione", title: "Business Manager", reportsTo: "Sarah Cranston" },
+    ],
+  },
+  {
+    name: "Sales",
+    people: [
+      { name: "Gerald Msimanga", title: "Sales Manager: Africa", reportsTo: "Rob Peché" },
+      { name: "Rob Peché", title: "Global Head of Sales", reportsTo: "Feron Lee Somiah" },
+      { name: "Sindiso Khupe", title: "Sales Manager: Africa", reportsTo: "Rob Peché" },
+    ],
+  },
+  {
+    name: "Sales - North America",
+    people: [
+      { name: "John Nicastro", title: "First Nations Business Development & Sales", reportsTo: "Robert Miller" },
+      { name: "Robert Kowalski", title: "Customer Success Manager: North America", reportsTo: "Robert Miller" },
+      { name: "Robert Miller", title: "President USA", reportsTo: "Steven Spartinos" },
+    ],
+  },
+  {
+    name: "Commercial",
+    people: [
+      { name: "Feron Lee Somiah", title: "Director of Commercial Services", reportsTo: "Steven Spartinos" },
+    ],
+  },
+  {
+    name: "Marketing",
+    people: [
+      { name: "Dominique Whittaker", title: "Senior Graphic Designer", reportsTo: "Patrick Eriksen" },
+      { name: "Melissa Jaggard", title: "Marketing Operations Manager", reportsTo: "Patrick Eriksen" },
+      { name: "Patrick Eriksen", title: "Head of Marketing", reportsTo: "Feron Lee Somiah" },
+      { name: "Philip Jonck", title: "Product Marketing Specialist", reportsTo: "Patrick Eriksen" },
+      { name: "Teneace Chetty", title: "Marketing Coordinator", reportsTo: "Melissa Jaggard" },
+    ],
+  },
+  {
+    name: "Risk, Legal, & Compliance",
+    people: [
+      { name: "Jadine Reddy", title: "Senior Compliance Advisor", reportsTo: "Nithin Parmanand" },
+      { name: "Nithin Parmanand", title: "Director of Legal & Compliance", reportsTo: "Steven Spartinos" },
+    ],
+  },
+  {
+    name: "Finance",
+    people: [
+      { name: "Kelsi Hart", title: "Senior Financial Accountant", reportsTo: "Tarryn Bales" },
+      { name: "Lino Cuamba", title: "Junior Accountant", reportsTo: "Tarryn Bales" },
+      { name: "Neli Nkosi", title: "Financial Accountant", reportsTo: "Tarryn Bales" },
+      { name: "Tarryn Bales", title: "Group Financial Manager", reportsTo: "Paul Shackleton" },
+    ],
+  },
+  {
+    name: "Operations",
+    people: [
+      { name: "Justin Frost", title: "Director of Operations", reportsTo: "Jason Pretorius" },
+    ],
+  },
+  {
+    name: "Shared Services",
+    people: [
+      { name: "Florence Ncube", title: "Office Cleaner", reportsTo: "Mandy Gallagher" },
+      { name: "Mandy Gallagher", title: "Executive PA / Office Manager", reportsTo: "Steven Spartinos" },
+    ],
+  },
+  {
+    name: "Executive",
+    people: [
+      { name: "Jason Pretorius", title: "Co-Chief Executive Officer" },
+      { name: "Paul Shackleton", title: "CFO", reportsTo: "Steven Spartinos" },
+      { name: "Steven Spartinos", title: "Co-Chief Executive Officer" },
     ],
   },
 ];
