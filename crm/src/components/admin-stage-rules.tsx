@@ -13,6 +13,7 @@ type Route = { id: string; fromStage: string; toStage: string; condition: string
 
 const WHAT: { value: RequirementKind; label: string }[] = [
   { value: "field", label: "A field is filled in" },
+  { value: "company_field", label: "A field on the contracting company is filled in" },
   { value: "has_contact", label: "A contact is added" },
   { value: "has_primary_company", label: "The contracting company is set" },
   { value: "has_collaborator", label: "A collaborator is added" },
@@ -58,7 +59,7 @@ function PlaybookStart({ playbook }: { playbook: { fields: number; rules: number
     <div className="mb-4 rounded-lg border border-brand bg-brand-soft/60 p-4">
       <p className="font-bold">Start from the sales playbook</p>
       <p className="mt-1 text-sm">
-        Adds the playbook&rsquo;s {playbook.fields} deal fields (with HubSpot&rsquo;s dropdown options) and {playbook.rules} rules: what each stage
+        Adds the playbook&rsquo;s {playbook.fields} fields (with HubSpot&rsquo;s dropdown options), the RICE evaluation button, and {playbook.rules} rules: what each stage
         needs, plus the {playbook.branches} branches (custom integrations go to Feasibility; aggregator deals skip Legal &amp; Compliance and end in
         Live via Aggregator). You can change or remove any of it afterwards.
       </p>
@@ -78,7 +79,7 @@ function PlaybookStart({ playbook }: { playbook: { fields: number; rules: number
   );
 }
 
-export function AdminStageRules({ stages, fields, requirements, routes, playbook }: { stages: Stage[]; fields: Field[]; requirements: Req[]; routes: Route[]; playbook: { fields: number; rules: number; branches: number } }) {
+export function AdminStageRules({ stages, fields, companyFields, requirements, routes, playbook }: { stages: Stage[]; fields: Field[]; companyFields: Field[]; requirements: Req[]; routes: Route[]; playbook: { fields: number; rules: number; branches: number } }) {
   const [open, setOpen] = useState<string | null>(stages[0]?.key ?? null);
   return (
     <section className="card p-5" aria-label="Stage rules">
@@ -107,7 +108,7 @@ export function AdminStageRules({ stages, fields, requirements, routes, playbook
                 <span className="font-bold">{i + 1}. {s.label}</span>
                 <span className="text-xs text-muted">{reqs.length ? `${reqs.length} requirement${reqs.length === 1 ? "" : "s"}` : "No rules · moves by hand"}</span>
               </button>
-              {isOpen && <StageRuleEditor stage={s} stages={stages} fields={fields} reqs={reqs} routes={out} />}
+              {isOpen && <StageRuleEditor stage={s} stages={stages} fields={fields} companyFields={companyFields} reqs={reqs} routes={out} />}
             </li>
           );
         })}
@@ -116,7 +117,7 @@ export function AdminStageRules({ stages, fields, requirements, routes, playbook
   );
 }
 
-function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage; stages: Stage[]; fields: Field[]; reqs: Req[]; routes: Route[] }) {
+function StageRuleEditor({ stage, stages, fields, companyFields, reqs, routes }: { stage: Stage; stages: Stage[]; fields: Field[]; companyFields: Field[]; reqs: Req[]; routes: Route[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -130,7 +131,8 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
   const [routeWhen, setRouteWhen] = useState("");
   const [routeValue, setRouteValue] = useState("");
   const label = (k: string) => stages.find((s) => s.key === k)?.label ?? k;
-  const chosenField = fields.find((f) => f.key === fieldKey);
+  const pickFrom = kind === "company_field" ? companyFields : fields;
+  const chosenField = pickFrom.find((f) => f.key === fieldKey);
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
     start(async () => {
@@ -159,16 +161,16 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <label className="label" htmlFor={`${stage.key}-what`}>Add a requirement</label>
-              <select id={`${stage.key}-what`} className="input" value={kind} onChange={(e) => setKind(e.target.value as RequirementKind)}>
+              <select id={`${stage.key}-what`} className="input" value={kind} onChange={(e) => { setKind(e.target.value as RequirementKind); setFieldKey(""); setMustBe([]); }}>
                 {WHAT.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
               </select>
             </div>
-            {kind === "field" && (
+            {(kind === "field" || kind === "company_field") && (
               <div>
-                <label className="label" htmlFor={`${stage.key}-field`}>Which field</label>
+                <label className="label" htmlFor={`${stage.key}-field`}>{kind === "company_field" ? "Which company field" : "Which field"}</label>
                 <select id={`${stage.key}-field`} className="input" value={fieldKey} onChange={(e) => { setFieldKey(e.target.value); setMustBe([]); }}>
                   <option value="">Choose a field</option>
-                  {fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                  {pickFrom.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
                 </select>
               </div>
             )}
@@ -182,7 +184,7 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
               </div>
             )}
           </div>
-          {kind === "field" && chosenField && conditionable(chosenField) && (
+          {(kind === "field" || kind === "company_field") && chosenField && conditionable(chosenField) && (
             <fieldset>
               <legend className="label">Counts only if the answer is (optional)</legend>
               <p className="mb-1 text-xs text-muted">Leave all unticked and any answer counts. Tick Yes to make &ldquo;No&rdquo; hold the deal back.</p>
@@ -199,8 +201,8 @@ function StageRuleEditor({ stage, stages, fields, reqs, routes }: { stage: Stage
           <ConditionPicker idPrefix={`${stage.key}-req`} fields={fields} field={whenField} value={whenValue} onField={setWhenField} onValue={setWhenValue} />
           <button
             className="btn-dark"
-            disabled={pending || (kind === "field" && !fieldKey) || (!!whenField && !whenValue)}
-            onClick={() => run(() => addRequirementAction({ stageKey: stage.key, kind, fieldKey, contactRole: role, whenField, whenValue, requiredValues: kind === "field" ? mustBe : [] }), () => { setFieldKey(""); setMustBe([]); setWhenField(""); setWhenValue(""); })}
+            disabled={pending || ((kind === "field" || kind === "company_field") && !fieldKey) || (!!whenField && !whenValue)}
+            onClick={() => run(() => addRequirementAction({ stageKey: stage.key, kind, fieldKey, contactRole: role, whenField, whenValue, requiredValues: kind === "field" || kind === "company_field" ? mustBe : [] }), () => { setFieldKey(""); setMustBe([]); setWhenField(""); setWhenValue(""); })}
           >
             Add requirement
           </button>

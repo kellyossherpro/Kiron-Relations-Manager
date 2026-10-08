@@ -29,6 +29,7 @@ npm run dev                   # http://localhost:3000 → "Set up KRM"
 | `npm run example:clear` | Empties it again. Refuses if anyone in it isn't an `@example.test` person |
 | `node e2e/tour.mjs` | With example data loaded and the app running: takes the screenshots for the KRM tour |
 | `node e2e/playbook.mjs` | On an empty database with the app running: the "Set up the playbook's rules" button |
+| `node e2e/step1.mjs` | With example data loaded and the app running: tier, RICE button, company legal entity, AM handover |
 | `npm run rules:daily` | Runs the daily rules by hand (30-day reminders, 60-day On Hold, 60 days On Hold → Closed Lost) |
 
 ## How it's built
@@ -44,6 +45,7 @@ src/lib/stage-rules-admin.ts  admin edits to stage rules; notifications
 src/lib/addendums.ts    the addendum loop: raise on a live deal, mark done or cancel, back to Live
 src/lib/kiron-pipeline.ts  the sales playbook as fields + stage rules (Admin → "Set up the playbook's rules")
 src/lib/conditions.ts   answer matching shared by stage rules and forms ("only show when")
+src/lib/settings.ts     company-wide settings (buttons on deals)
 src/lib/links.ts        contacts↔companies, deal contacts with roles, collaborators
 src/lib/activities.ts   notes, calls, meetings, tasks
 src/lib/admin.ts        first admin, people, field definitions
@@ -73,6 +75,10 @@ Rules that matter:
   names and dropdown options. A requirement can need specific answers ("Technical review performed is Yes");
   a field can be shown only for certain answers of another ("Server name" only when "Dedicated server" is
   Yes). Deal sections for stages not reached yet fold under "Later stages". Lists over 12 options are searched.
+- **Filled in by KRM**: a dropdown field can be worked out from a number field by ranges (Customer tier
+  from the monthly amount); nobody can type it. A requirement can check the contracting company's fields
+  ("company_field"), and saving a company re-checks its deals. At Closed Won the deal is handed to its one
+  account manager collaborator (the previous owner stays as collaborator); otherwise the owner is reminded.
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.
 - **Sign-in** is a development picker (`AUTH_MODE=dev`). Microsoft sign-in replaces it before go-live.
 

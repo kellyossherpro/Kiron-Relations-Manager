@@ -20,6 +20,7 @@ export function canEditRecord(actor: Actor, record: { ownerId: string | null }, 
 }
 
 export function canEditField(actor: Actor, objectType: ObjectType, record: { ownerId: string | null }, spec: FieldSpec, opts: { collaboratorIds?: string[] } = {}) {
+  if (spec.derive) return false; // filled in by KRM, never typed
   if (canEditRecord(actor, record, opts)) {
     // Only the owner, a manager or an admin can hand a record to someone else.
     if (spec.key === "ownerId") return isManager(actor) || record.ownerId === actor.id;

@@ -43,13 +43,14 @@ export async function addRequirement(actor: Actor, input: RequirementInput) {
   requireAdmin(actor);
   if (!REQUIREMENT_KINDS.includes(input.kind)) throw new RuleError("Pick what's required.");
   const cfg = await validate(input);
-  const field = input.kind === "field" ? cfg.fields.find((f) => f.key === input.fieldKey) : undefined;
-  if (input.kind === "field" && !field) throw new RuleError("Pick the field that must be filled in.");
-  const required = input.kind === "field" ? [...new Set((input.requiredValues ?? []).map((v) => v.trim()).filter(Boolean))] : [];
+  const onField = input.kind === "field" || input.kind === "company_field";
+  const field = input.kind === "field" ? cfg.fields.find((f) => f.key === input.fieldKey) : input.kind === "company_field" ? cfg.companyFields.find((f) => f.key === input.fieldKey) : undefined;
+  if (onField && !field) throw new RuleError("Pick the field that must be filled in.");
+  const required = onField ? [...new Set((input.requiredValues ?? []).map((v) => v.trim()).filter(Boolean))] : [];
   if (required.length && !required.every((v) => answersFor(field!).includes(v))) throw new RuleError(`Pick the answers from ${field!.label}'s options.`);
   if (input.kind === "has_contact" && input.contactRole && !(DEAL_CONTACT_ROLES as readonly string[]).includes(input.contactRole)) throw new RuleError("Pick a contact role.");
   const dup = cfg.requirements.some(
-    (r) => r.stageKey === input.stageKey && r.kind === input.kind && (r.fieldKey ?? null) === (input.kind === "field" ? input.fieldKey : null) &&
+    (r) => r.stageKey === input.stageKey && r.kind === input.kind && (r.fieldKey ?? null) === (onField ? input.fieldKey : null) &&
       (r.contactRole ?? null) === (input.kind === "has_contact" ? (input.contactRole || null) : null) && (r.whenField ?? null) === (input.whenField || null) && (r.whenValue ?? null) === (input.whenField ? input.whenValue?.trim() : null) &&
       JSON.stringify([...(r.requiredValues ?? [])].sort()) === JSON.stringify([...required].sort()),
   );
@@ -57,7 +58,7 @@ export async function addRequirement(actor: Actor, input: RequirementInput) {
   const pos = cfg.requirements.filter((r) => r.stageKey === input.stageKey).reduce((m, r) => Math.max(m, r.position), 0) + 1;
   const res = await db.execute(sql`
     insert into stage_requirements (stage_key, kind, field_key, contact_role, when_field, when_value, required_values, position)
-    values (${input.stageKey}, ${input.kind}, ${input.kind === "field" ? input.fieldKey! : null}, ${input.kind === "has_contact" ? input.contactRole || null : null},
+    values (${input.stageKey}, ${input.kind}, ${onField ? input.fieldKey! : null}, ${input.kind === "has_contact" ? input.contactRole || null : null},
             ${input.whenField || null}, ${input.whenField ? input.whenValue!.trim() : null}, ${required.length ? JSON.stringify(required) : null}::jsonb, ${pos})
     returning id`);
   return res.rows[0].id as string;

@@ -14,6 +14,8 @@ const KIND_LABEL: Record<string, string> = {
   addendum_raised: "Addendum",
   addendum_done: "Addendum done",
   addendum_cancelled: "Addendum cancelled",
+  handover_owner: "Handed over",
+  handover_reminder: "Action needed",
 };
 
 export default async function NotificationsPage() {

@@ -2,9 +2,9 @@ import { sql, type SQL } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import type { ObjectType } from "@/db/schema";
 import { NotFoundError, PermissionError, RuleError, translateDbError } from "./errors";
-import { FieldError, fieldsFor, normalizeValue, PROP_PREFIX, readFieldValue, sameValue, type FieldSpec } from "./fields";
+import { deriveValue, FieldError, fieldsFor, normalizeValue, PROP_PREFIX, readFieldValue, sameValue, type FieldSpec } from "./fields";
 import { canCreate, canDelete, canEditField, canMoveStage, OWNER_EXCEPTION_STAGES, type Actor } from "./permissions";
-import { autoAdvance } from "./stage-engine";
+import { autoAdvance, handOverToAccountManager } from "./stage-engine";
 
 export const TABLES: Record<ObjectType, string> = { company: "companies", contact: "contacts", deal: "deals" };
 
@@ -17,7 +17,7 @@ export type SaveResult = { status: "saved"; version: number; movedTo?: string[] 
 
 async function loadSpecs(tx: Tx | typeof db, objectType: ObjectType) {
   const res = await tx.execute(sql`
-    select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", archived
+    select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, archived
     from property_definitions where object_type = ${objectType}`);
   return fieldsFor(objectType, res.rows as never);
 }
@@ -79,6 +79,13 @@ export async function createRecord(actor: Actor, objectType: ObjectType, values:
     for (const key of Object.keys(values)) {
       if (!specs.some((s) => s.key === key)) throw new FieldError(key, `Unknown field "${key}".`);
     }
+    for (const spec of specs.filter((x) => x.derive)) {
+      const v = deriveValue(spec.derive!, snapshot[spec.derive!.from]);
+      if (v === null) continue;
+      snapshot[spec.key] = v;
+      if (spec.column) cols[spec.column] = v;
+      else props[spec.key.slice(PROP_PREFIX.length)] = v;
+    }
 
     if (objectType === "deal") {
       const first = await tx.execute(sql`select key from pipeline_stages where kind = 'open' order by position limit 1`);
@@ -125,6 +132,7 @@ export async function updateRecord(
     for (const [key, raw] of Object.entries(changes)) {
       const spec = specs.find((s) => s.key === key);
       if (!spec) throw new FieldError(key, `Unknown field "${key}".`);
+      if (spec.derive) throw new FieldError(key, `${spec.label} fills in by itself.`);
       if (!canEditField(actor, objectType, { ownerId: row.owner_id }, spec, { collaboratorIds: collabs })) {
         throw new PermissionError(`You can't edit ${spec.label} on this record.`);
       }
@@ -141,6 +149,16 @@ export async function updateRecord(
 
     if (conflicts.length) return { status: "conflict", conflicts, version: row.version };
     if (!writes.length) return { status: "saved", version: row.version };
+
+    // Fields KRM fills in from another one follow the new value (e.g. tier from the amount).
+    for (const spec of specs.filter((x) => x.derive)) {
+      const src = specs.find((x) => x.key === spec.derive!.from);
+      if (!src) continue;
+      const written = writes.find((w) => w.spec.key === src.key);
+      const next = deriveValue(spec.derive!, written ? written.newValue : readField(row, src));
+      const current = readField(row, spec);
+      if (!sameValue(current, next)) writes.push({ spec, oldValue: current, newValue: next });
+    }
 
     const assignments: [string, unknown][] = [];
     const props = { ...(row.properties ?? {}) };
@@ -163,6 +181,11 @@ export async function updateRecord(
     for (const w of writes) await audit(tx, actor, objectType, id, "update", w.spec.key, w.oldValue, w.newValue);
     // Same transaction and row lock: if this save completed the stage, the deal moves exactly once.
     const movedTo = objectType === "deal" ? await autoAdvance(tx, id) : [];
+    // A company's fields can complete its deals' stages (e.g. the registered address).
+    if (objectType === "company") {
+      const deals = await tx.execute(sql`select id from deals where primary_company_id = ${id} and deleted_at is null order by id`);
+      for (const d of deals.rows) await autoAdvance(tx, d.id as string);
+    }
     const version = movedTo.length ? ((await tx.execute(sql`select version from deals where id = ${id}`)).rows[0].version as number) : (res.rows[0].version as number);
     return { status: "saved", version, movedTo };
   });
@@ -201,6 +224,7 @@ export async function moveDealStage(
     await tx.execute(sql`
       update addendums set status = 'cancelled', closed_by = ${actor.id}, closed_at = now(), close_note = ${`Deal moved to ${stage.rows[0].label} by hand: ${reason}`}
       where deal_id = ${dealId} and status = 'open'`);
+    if (stage.rows[0].kind === "won") await handOverToAccountManager(tx, dealId);
     return { status: "moved" };
   });
 }

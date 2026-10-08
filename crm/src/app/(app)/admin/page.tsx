@@ -1,3 +1,4 @@
+import { AdminDealButtons } from "@/components/admin-deal-buttons";
 import { AdminFields } from "@/components/admin-fields";
 import { AdminStageRules } from "@/components/admin-stage-rules";
 import { kironPipelineSummary } from "@/lib/kiron-pipeline";
@@ -7,13 +8,14 @@ import { AdminUsers } from "@/components/admin-users";
 import { canManageUsersAndFields } from "@/lib/permissions";
 import { listDefinitions, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
+import { dealButtons } from "@/lib/settings";
 
 export const metadata = { title: "Admin" };
 
 export default async function AdminPage() {
   const actor = await requireActor();
   if (!canManageUsersAndFields(actor)) return <p>Only admins can see this page.</p>;
-  const [users, defs, cfg] = await Promise.all([listUsers(true), listDefinitions(undefined, true), loadPipelineConfig(db)]);
+  const [users, defs, cfg, buttons] = await Promise.all([listUsers(true), listDefinitions(undefined, true), loadPipelineConfig(db), dealButtons()]);
   return (
     <div className="space-y-5">
       <h1 className="h1">Admin</h1>
@@ -23,9 +25,11 @@ export default async function AdminPage() {
         playbook={kironPipelineSummary()}
         stages={cfg.stages}
         fields={cfg.fields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))}
+        companyFields={cfg.companyFields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))}
         requirements={cfg.requirements.map((r) => ({ id: r.id, stageKey: r.stageKey, label: requirementLabel(cfg, r) }))}
         routes={cfg.transitions.map((t) => ({ id: t.id, fromStage: t.fromStage, toStage: t.toStage, condition: conditionText(cfg, t.whenField, t.whenValue) }))}
       />
+      <AdminDealButtons buttons={buttons} fields={cfg.fields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))} />
     </div>
   );
 }

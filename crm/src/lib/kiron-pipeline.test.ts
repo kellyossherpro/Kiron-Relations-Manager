@@ -7,8 +7,10 @@ import { PermissionError, RuleError } from "./errors";
 import { applyKironPipeline, KIRON_FIELDS, kironPipelineSummary } from "./kiron-pipeline";
 import { addCollaborator, addDealContact } from "./links";
 import type { Actor } from "./permissions";
-import { createRecord, updateRecord } from "./records";
+import { createRecord, moveDealStage, updateRecord } from "./records";
 import { evaluateDeal } from "./stage-engine";
+import { listNotifications } from "./stage-rules-admin";
+import { dealButtons } from "./settings";
 
 beforeEach(async () => {
   await resetDb();
@@ -70,9 +72,12 @@ async function toQualifiedLead(s: Awaited<ReturnType<typeof setUp>>) {
   await fill(s.sales, s.deal, { "p.country_where_operator_is_based": "South Africa", "p.lead_source": "LinkedIn", amountMonthly: "8000" });
   expect(await stageOf(s.deal)).toBe("customer_engagement");
 
-  await fill(s.sales, s.deal, { primaryCompanyId: s.company, "p.legal_entity_address": "1 Example Road", "p.kiron_contracting_entity": "South Africa" });
-  expect(await missing(s.deal)).toEqual(["A contact added"]);
+  await fill(s.sales, s.deal, { primaryCompanyId: s.company, "p.kiron_contracting_entity": "South Africa" });
+  expect(await missing(s.deal)).toEqual(["Legal entity address (on the contracting company)", "A contact added"]);
   await addDealContact(s.sales, s.deal, s.person, "primary");
+  expect(await stageOf(s.deal)).toBe("customer_engagement");
+  // The address is typed once, on the company, and that moves the deal on.
+  await updateRecord(s.sales, "company", s.company, { "p.legal_entity_address": "1 Example Road" }, { "p.legal_entity_address": null });
   expect(await stageOf(s.deal)).toBe("qualified_lead");
 }
 
@@ -83,7 +88,12 @@ describe("setting up the playbook", () => {
     const summary = await applyKironPipeline(admin);
     expect(summary).toEqual(kironPipelineSummary());
     const n = await db.execute(sql`select count(*)::int as n from property_definitions where object_type = 'deal'`);
-    expect(n.rows[0].n).toBe(KIRON_FIELDS.length);
+    expect(n.rows[0].n).toBe(KIRON_FIELDS.filter((d) => !d.company).length);
+    const onCompany = await db.execute(sql`select key from property_definitions where object_type = 'company' order by key`);
+    expect(onCompany.rows.map((r) => r.key)).toEqual(["legal_entity_address", "registration_number"]);
+    expect(await dealButtons()).toEqual([
+      { label: "RICE evaluation", url: "https://employee-tools.kironinteractive.com/rice", showWhen: { field: "p.integration_type", values: ["A Bespoke (Custom) Integration"] } },
+    ]);
     await expect(applyKironPipeline(admin)).rejects.toThrow(/already set up/);
   });
 
@@ -137,6 +147,11 @@ describe("a deal through Kiron's pipeline", () => {
     await fill(s.sales, s.deal, { "p.agreement_signed_internally": true });
     expect(await stageOf(s.deal)).toBe("closed_won");
 
+    // The account manager (the collaborator) takes over; Sales stays on as a collaborator.
+    expect((await db.execute(sql`select owner_id from deals where id = ${s.deal}`)).rows[0].owner_id).toBe(s.am.id);
+    expect((await db.execute(sql`select user_id from deal_collaborators where deal_id = ${s.deal}`)).rows.map((r) => r.user_id)).toEqual([s.sales.id]);
+    expect((await listNotifications(s.am.id)).map((n) => n.message)).toContain(`You now own "Example Operator – BetMan Retail": it reached Closed Won.`);
+
     await fill(s.am, s.deal, {
       "p.contract_counter_signed_date": "2026-11-02",
       "p.teams_group_link": "teams.example.test/g/1",
@@ -159,6 +174,9 @@ describe("a deal through Kiron's pipeline", () => {
     expect(await missing(s.deal)).toEqual(["Aggregator (when Via aggregator is Yes)"]); // no collaborator needed
     await fill(s.sales, s.deal, { viaAggregatorId: aggregator });
     expect(await stageOf(s.deal)).toBe("closed_won");
+    // No AM on an aggregator deal yet: the owner is asked to pick one.
+    expect((await db.execute(sql`select owner_id from deals where id = ${s.deal}`)).rows[0].owner_id).toBe(s.sales.id);
+    expect((await listNotifications(s.sales.id)).filter((n) => n.kind === "handover_reminder")).toHaveLength(1);
 
     for (const role of ["finance", "marketing", "support"]) await addDealContact(s.sales, s.deal, s.person, role);
     await fill(s.sales, s.deal, {
@@ -211,3 +229,36 @@ describe("a deal through Kiron's pipeline", () => {
     await expect(addRequirement(s.admin, { stageKey: "lead", kind: "field", fieldKey: "p.lead_source", requiredValues: ["Carrier pigeon"] })).rejects.toThrow(RuleError);
   });
 });
+
+describe("filled in by KRM", () => {
+  it("sets the customer tier from the monthly amount, and nobody can type it", async () => {
+    const s = await setUp();
+    const tier = async () => (await db.execute(sql`select properties->>'customer_tier' as t from deals where id = ${s.deal}`)).rows[0].t;
+    expect(await tier()).toBeNull();
+    await fill(s.sales, s.deal, { amountMonthly: "8000" });
+    expect(await tier()).toBe("Tier 3");
+    for (const [amount, want] of [["50000", "Tier 1"], ["49999.99", "Tier 2"], ["10000", "Tier 2"], ["1000", "Tier 3"], ["999", "Tier 4"]]) {
+      const before = (await db.execute(sql`select amount_monthly from deals where id = ${s.deal}`)).rows[0].amount_monthly;
+      await updateRecord(s.sales, "deal", s.deal, { amountMonthly: amount }, { amountMonthly: before });
+      expect(await tier()).toBe(want);
+    }
+    await expect(updateRecord(s.admin, "deal", s.deal, { "p.customer_tier": "Tier 1" }, { "p.customer_tier": "Tier 4" })).rejects.toThrow(/fills in by itself/);
+    const created = await createRecord(s.sales, "deal", { name: "Big one", amountMonthly: "75000" });
+    expect((await db.execute(sql`select properties->>'customer_tier' as t from deals where id = ${created}`)).rows[0].t).toBe("Tier 1");
+  });
+});
+
+describe("handing won deals to the account manager", () => {
+  it("asks the owner to choose when more than one AM is on the deal, also on a manual move", async () => {
+    const s = await setUp();
+    const am2 = await makeUser("account_manager");
+    await addCollaborator(s.sales, s.deal, s.am.id);
+    await addCollaborator(s.sales, s.deal, am2.id);
+    await moveDealStage(s.admin, s.deal, "closed_won", { expectedStage: "lead", reason: "Example: signed early" });
+    expect((await db.execute(sql`select owner_id from deals where id = ${s.deal}`)).rows[0].owner_id).toBe(s.sales.id);
+    expect((await listNotifications(s.sales.id)).map((n) => n.message)).toContain(
+      `"Example Operator – BetMan Retail" reached Closed Won with 2 account managers on it. Pick the one who'll own it: change the Owner in Details.`,
+    );
+  });
+});
+

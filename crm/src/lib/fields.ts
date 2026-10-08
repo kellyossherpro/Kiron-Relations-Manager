@@ -15,7 +15,18 @@ export type FieldSpec = {
   group?: string;
   extraEditorRoles?: string[];
   showWhen?: ShowWhen | null;
+  derive?: Derive | null;
 };
+
+// A field KRM fills in from another one by ranges (Customer tier from the monthly amount).
+export type Derive = { from: string; ranges: { min: number; value: string }[] };
+
+export function deriveValue(d: Derive, source: unknown): string | null {
+  if (source === null || source === undefined || source === "") return null;
+  const n = Number(source);
+  if (!Number.isFinite(n)) return null;
+  return [...d.ranges].sort((a, b) => b.min - a.min).find((r) => n >= r.min)?.value ?? null;
+}
 
 export const CORE_FIELDS: Record<ObjectType, FieldSpec[]> = {
   company: [
@@ -51,6 +62,7 @@ export type PropertyDefinitionLike = {
   groupLabel: string | null;
   extraEditorRoles: string[];
   showWhen?: ShowWhen | null;
+  derive?: Derive | null;
   archived: boolean;
 };
 
@@ -65,6 +77,7 @@ export function fieldsFor(objectType: ObjectType, defs: PropertyDefinitionLike[]
       group: d.groupLabel ?? undefined,
       extraEditorRoles: d.extraEditorRoles,
       showWhen: d.showWhen ?? null,
+      derive: d.derive ?? null,
     }));
   return [...CORE_FIELDS[objectType], ...custom];
 }

@@ -6,6 +6,7 @@ import { PermissionError, RuleError } from "./errors";
 import { PROP_PREFIX } from "./fields";
 import { COUNTRIES, PRODUCTS } from "./kiron-pipeline-options";
 import { canManageUsersAndFields, type Actor } from "./permissions";
+import { dealButtons, setSetting, type DealButton } from "./settings";
 import { addRequirement, addTransition, type RequirementInput } from "./stage-rules-admin";
 
 // Kiron's pipeline as the sales playbook describes it (kiron-sales-playbook repo,
@@ -14,7 +15,18 @@ import { addRequirement, addTransition, type RequirementInput } from "./stage-ru
 // Field names and options follow HubSpot's, so the import lines up.
 
 // `shown`: only show the field when another field has one of these answers.
-type FieldDef = { label: string; type: FieldType; options?: string[]; group: string; legalCanEdit?: boolean; shown?: [string, string[]] };
+// `company`: the field lives on the company (e.g. its registered address), not the deal.
+// `fromAmount`: filled in by KRM from the monthly amount by these minimums, never typed.
+type FieldDef = {
+  label: string;
+  type: FieldType;
+  options?: string[];
+  group: string;
+  legalCanEdit?: boolean;
+  shown?: [string, string[]];
+  company?: true;
+  fromAmount?: [string, number][];
+};
 
 const G = {
   lead: "Lead",
@@ -53,13 +65,20 @@ export const KIRON_FIELDS: FieldDef[] = [
       "SIGMA Africa 2025", "BiG Africa Summit 2025", "Enada 2025", "ICE Barcelona 2025", "GAT Cancún 2025", "SBC Summit Latinoamérica 2024", "ASA",
     ],
   },
-  // 02 Customer Engagement (the legal entity is the contracting company itself)
-  { label: "Legal entity address", type: "textarea", group: G.ce },
-  { label: "Registration number", type: "text", group: G.ce },
+  // 02 Customer Engagement. The legal entity is the contracting company itself, so its address
+  // and registration number live on the company and are typed once per client (Q52).
+  { label: "Legal entity address", type: "textarea", group: "Legal entity", company: true },
+  { label: "Registration number", type: "text", group: "Legal entity", company: true },
   { label: "Kiron contracting entity", type: "select", options: ["South Africa", "Mauritius", "Uruguay", "Brazil"], group: G.ce },
   // 03 Qualified Lead
   { label: "Distribution channel", type: "select", options: ["Retail", "Online", "Omni", "Mobile"], group: G.money },
-  { label: "Customer tier", type: "select", options: ["Tier 1", "Tier 2", "Tier 3", "Tier 4"], group: G.money },
+  {
+    label: "Customer tier",
+    type: "select",
+    options: ["Tier 1", "Tier 2", "Tier 3", "Tier 4"],
+    group: G.money,
+    fromAmount: [["Tier 1", 50_000], ["Tier 2", 10_000], ["Tier 3", 1_000], ["Tier 4", 0]], // Q42
+  },
   { label: "B2B or B2C", type: "select", options: ["B2B", "B2C", "B2B and B2C"], group: G.money },
   { label: "Setup fee (USD)", type: "money", group: G.money },
   { label: "Monthly minimum amount (USD)", type: "money", group: G.money },
@@ -139,7 +158,7 @@ export const KIRON_RULES: Record<string, Rule[]> = {
   lead: [need("Country where operator is based"), need("Lead source"), { kind: "field", fieldKey: "amountMonthly" }],
   customer_engagement: [
     { kind: "has_primary_company" },
-    need("Legal entity address"),
+    { kind: "company_field", fieldKey: PROP_PREFIX + slugKey("Legal entity address") },
     need("Kiron contracting entity"),
     { kind: "has_contact" },
   ],
@@ -222,6 +241,10 @@ const BRANCHES: { from: string; to: string; when: [string, string] }[] = [
   { from: "closed_won", to: "live_aggregator", when: VIA_YES },
 ];
 
+// Buttons on deals (Admin → Buttons on deals). The RICE evaluation is done in the portal (Q42).
+const BUTTONS: DealButton[] = [{ label: "RICE evaluation", url: "https://employee-tools.kironinteractive.com/rice", showWhen: null }];
+const BUTTON_WHEN: Record<string, [string, string[]]> = { "RICE evaluation": CUSTOM_ONLY };
+
 export function kironPipelineSummary() {
   return {
     fields: KIRON_FIELDS.length,
@@ -240,24 +263,27 @@ export async function applyKironPipeline(actor: Actor) {
   const existing = await db.execute(sql`select count(*)::int as n from stage_requirements`);
   if ((existing.rows[0].n as number) > 0) throw new RuleError("Stage rules are already set up. Change them stage by stage below.");
 
-  const defs = await db.execute(sql`select key, type, archived from property_definitions where object_type = 'deal'`);
-  const have = new Map(defs.rows.map((r) => [r.key as string, r as { type: string; archived: boolean }]));
+  const defs = await db.execute(sql`select object_type, key, type, archived from property_definitions where object_type in ('deal', 'company')`);
+  const have = new Map(defs.rows.map((r) => [`${r.object_type}:${r.key}`, r as { type: string; archived: boolean }]));
+  const keyOf = (d: FieldDef) => `${d.company ? "company" : "deal"}:${slugKey(d.label)}`;
   for (const d of KIRON_FIELDS) {
-    const old = have.get(slugKey(d.label));
-    if (old && old.type !== d.type) throw new RuleError(`A deal field called "${d.label}" already exists with a different type. Rename it first.`);
-    if (old?.archived) throw new RuleError(`A hidden deal field called "${d.label}" already exists. Show it again or rename it first.`);
+    const where = d.company ? "company" : "deal";
+    const old = have.get(keyOf(d));
+    if (old && old.type !== d.type) throw new RuleError(`A ${where} field called "${d.label}" already exists with a different type. Rename it first.`);
+    if (old?.archived) throw new RuleError(`A hidden ${where} field called "${d.label}" already exists. Show it again or rename it first.`);
   }
 
   for (const d of KIRON_FIELDS) {
-    if (have.has(slugKey(d.label))) continue;
+    if (have.has(keyOf(d))) continue;
     await createFieldDefinition(actor, {
-      objectType: "deal",
+      objectType: d.company ? "company" : "deal",
       label: d.label,
       type: d.type,
       options: d.options,
       groupLabel: d.group,
       extraEditorRoles: d.legalCanEdit ? ["legal"] : [],
       showWhen: d.shown ? { field: f(d.shown[0]), values: d.shown[1] } : null,
+      derive: d.fromAmount ? { from: "amountMonthly", ranges: d.fromAmount.map(([value, min]) => ({ value, min })) } : null,
     });
   }
   for (const [stageKey, rules] of Object.entries(KIRON_RULES)) {
@@ -267,5 +293,11 @@ export async function applyKironPipeline(actor: Actor) {
   const hasPlainRoute = new Set(routes.rows.map((r) => r.from_stage as string));
   for (const [from, to] of STRAIGHT_LINE) if (!hasPlainRoute.has(from)) await addTransition(actor, { fromStage: from, toStage: to });
   for (const b of BRANCHES) await addTransition(actor, { fromStage: b.from, toStage: b.to, whenField: f(b.when[0]), whenValue: b.when[1] });
+  const buttons = await dealButtons();
+  const missing = BUTTONS.filter((b) => !buttons.some((x) => x.label === b.label)).map((b) => {
+    const when = BUTTON_WHEN[b.label];
+    return { ...b, showWhen: when ? { field: f(when[0]), values: when[1] } : null };
+  });
+  if (missing.length) await setSetting("deal_buttons", [...buttons, ...missing]);
   return kironPipelineSummary();
 }

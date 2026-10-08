@@ -12,7 +12,7 @@ const TYPE_LABEL: Record<FieldType, string> = {
 const OBJECT_LABEL: Record<ObjectType, string> = { deal: "Deals", company: "Companies", contact: "Contacts" };
 
 type ShowWhen = { field: string; values: string[] } | null;
-type Def = { id: string; objectType: ObjectType; key: string; label: string; type: FieldType; options: string[]; groupLabel: string | null; extraEditorRoles: string[]; showWhen?: ShowWhen; archived: boolean };
+type Def = { id: string; objectType: ObjectType; key: string; label: string; type: FieldType; options: string[]; groupLabel: string | null; extraEditorRoles: string[]; showWhen?: ShowWhen; derive?: { from: string; ranges: { min: number; value: string }[] } | null; archived: boolean };
 type SaveInput = { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: ShowWhen; archived?: boolean };
 
 const answersOf = (d: Def) => (d.type === "yesno" ? ["Yes", "No"] : d.options);
@@ -109,6 +109,12 @@ function FieldRow({ d, others, pending, onSave }: { d: Def; others: Def[]; pendi
           <div>
             <span className="font-bold">{d.label}</span>
             <span className="ml-2 text-xs text-muted">{TYPE_LABEL[d.type]}{d.groupLabel ? ` · ${d.groupLabel}` : ""}{d.extraEditorRoles.includes("legal") ? " · Legal can edit" : ""}{d.archived ? " · Hidden" : ""}</span>
+            {d.derive && (
+              <p className="text-xs text-muted">
+                Fills in by itself:{" "}
+                {[...d.derive.ranges].sort((a, b) => b.min - a.min).map((r) => `${r.value} from ${r.min.toLocaleString("en-US")}`).join(" · ")}
+              </p>
+            )}
             {d.showWhen && <p className="text-xs text-muted">Only shown when {controllerOf(d.showWhen) ?? "another field"} is {d.showWhen.values.join(" or ")}</p>}
             {hasOptions && <p className="text-xs text-muted">{d.options.slice(0, 8).join(", ")}{d.options.length > 8 ? ` and ${d.options.length - 8} more` : ""}</p>}
           </div>

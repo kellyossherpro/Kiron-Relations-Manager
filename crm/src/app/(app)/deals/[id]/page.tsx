@@ -14,6 +14,8 @@ import { dealAddendums } from "@/lib/addendums";
 import { canDelete, canEditRecord, canFinishAddendum, canLogActivity, canMoveStage, canRaiseAddendum, isManager } from "@/lib/permissions";
 import { companyOptions, contactOptions, dealDaysInStage, getDealLinks, getRecord, listActivities, listHistory, listStages, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
+import { isShown } from "@/lib/conditions";
+import { dealButtons } from "@/lib/settings";
 import { evaluateDeal } from "@/lib/stage-engine";
 import { clientFields } from "@/lib/view";
 
@@ -28,7 +30,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     throw e;
   }
   const { row, specs, values } = record;
-  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation, addendums] = await Promise.all([
+  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation, addendums, buttons] = await Promise.all([
     getDealLinks(id),
     listStages(),
     listUsers(),
@@ -39,7 +41,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     dealDaysInStage(id),
     evaluateDeal(id),
     dealAddendums(id),
+    dealButtons(),
   ]);
+  const shownButtons = buttons.filter((b) => isShown({ key: "", showWhen: b.showWhen }, values));
   const collabIds = links.collaborators.map((c) => c.id);
   const ownerId = row.owner_id;
   const canEdit = canEditRecord(actor, { ownerId }, { collaboratorIds: collabIds });
@@ -68,11 +72,21 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             {stage?.label} · {plural(daysInStage, "day")} in this stage · Owner: {users.find((u) => u.id === ownerId)?.name ?? "nobody"}
           </p>
         </div>
-        {canDelete(actor) && <DeleteRecord objectType="deal" id={id} label="deal" />}
+        <div className="flex flex-wrap items-center gap-2">
+          {shownButtons.map((b) => (
+            <a key={b.label} href={b.url} target="_blank" rel="noreferrer" className="btn-ghost">{b.label} ↗</a>
+          ))}
+          {canDelete(actor) && <DeleteRecord objectType="deal" id={id} label="deal" />}
+        </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">
+          {stage && ["won", "live"].includes(stage.kind) && users.find((u) => u.id === ownerId)?.role !== "account_manager" && (
+            <p className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm" role="status">
+              <strong>Won deals are owned by an account manager.</strong> Change the Owner in Details to the AM who&rsquo;ll look after this client.
+            </p>
+          )}
           <StageMover dealId={id} current={String(row.stage_key)} stages={stages} allowed={allowedStages} checklist={evaluation?.requirements ?? []} nextLabel={evaluation?.next?.label ?? null} />
           {showAddendums && (
             <AddendumPanel

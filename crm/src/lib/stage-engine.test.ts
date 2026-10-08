@@ -44,6 +44,7 @@ describe("evaluate (pure rules)", () => {
       { key: "p.type", label: "Integration type", type: "select", options: ["Custom", "Vanilla"] },
       { key: "p.rice", label: "RICE report", type: "text" },
     ],
+    companyFields: [],
   };
   const deal = (values: Record<string, unknown>) => ({ stageKey: "a", values, contactRoles: [], hasPrimaryCompany: false, collaboratorCount: 0 });
 

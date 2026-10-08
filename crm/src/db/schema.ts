@@ -176,6 +176,9 @@ export const propertyDefinitions = pgTable(
     // Only show the field when another field has one of these answers (e.g. "Server name"
     // only when "Dedicated server" is Yes). Null = always shown.
     showWhen: jsonb("show_when").$type<{ field: string; values: string[] }>(),
+    // Filled in by KRM from another field by ranges, never typed (e.g. Customer tier from the
+    // monthly amount). Ranges are checked from the highest "min" down.
+    derive: jsonb("derive").$type<{ from: string; ranges: { min: number; value: string }[] }>(),
     archived: boolean("archived").notNull().default(false),
     ...timestamps,
   },
@@ -234,11 +237,12 @@ export const auditLog = pgTable(
 // What a deal needs before it can leave a stage. `kind`:
 // - field: the field (built-in key or "p.<key>") must be filled in, or have one of
 //   `required_values` (e.g. "Technical review performed" must be Yes)
+// - company_field: the contracting company has that field filled in (e.g. its registered address)
 // - has_contact: at least one contact on the deal (optionally with a given role)
 // - has_primary_company: the contracting company is set
 // - has_collaborator: at least one collaborator
 // A requirement can apply only when another field has a given value ("when").
-export const REQUIREMENT_KINDS = ["field", "has_contact", "has_primary_company", "has_collaborator"] as const;
+export const REQUIREMENT_KINDS = ["field", "company_field", "has_contact", "has_primary_company", "has_collaborator"] as const;
 export type RequirementKind = (typeof REQUIREMENT_KINDS)[number];
 
 export const stageRequirements = pgTable(
@@ -323,3 +327,11 @@ export const addendums = pgTable(
     uniqueIndex("addendums_one_open").on(t.dealId).where(sql`${t.status} = 'open'`),
   ],
 );
+
+// Small company-wide settings an admin can change, e.g. the buttons shown on deals.
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").$type<unknown>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+

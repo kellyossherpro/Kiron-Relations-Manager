@@ -71,7 +71,8 @@ export async function loadExampleData() {
     ["Example Aggregator Ltd", "online", "aggregator.example.test"],
     ["Kestrel Sports Ltd", "both", "kestrel.example.test"],
   ] as const) {
-    co[name] = await createRecord(sam, "company", { name, companyType: type, ...(website ? { website } : {}) });
+    const address = name.startsWith("Bluebay") ? { "p.legal_entity_address": "1 Example Street, London" } : {};
+    co[name] = await createRecord(sam, "company", { name, companyType: type, ...(website ? { website } : {}), ...address });
   }
 
   // Contacts
@@ -97,7 +98,6 @@ export async function loadExampleData() {
     return createRecord(owner, "deal", { name, primaryCompanyId: co[company], ...country, ...(amount ? { amountMonthly: amount } : {}), ...extra });
   }
   const bluebay = await deal(sam, "Bluebay – Online Casino Games", "Bluebay Gaming Ltd", null, {
-    "p.legal_entity_address": "1 Example Street, London",
     "p.kiron_contracting_entity": "Mauritius",
   });
   await addDealContact(sam, bluebay, ct.Priya, "primary");
@@ -131,6 +131,13 @@ export async function loadExampleData() {
 
   await addCollaborator(sam, bluebay, alex.id);
   await addCollaborator(sam, live1, alex.id);
+  await addCollaborator(sam, bluebay2, alex.id); // direct deals get their AM at Proposal
+  // Won and live clients are looked after by the account manager; Sales stays on as collaborator.
+  for (const id of [kestrelWon, live1, live2, live3]) {
+    await db.execute(sql`delete from deal_collaborators where deal_id = ${id} and user_id = ${alex.id}`);
+    await db.execute(sql`insert into deal_collaborators (deal_id, user_id) select id, owner_id from deals where id = ${id} on conflict do nothing`);
+    await db.execute(sql`update deals set owner_id = ${alex.id} where id = ${id}`);
+  }
 
   // Activity
   await logActivity(sam, { type: "call", body: "Intro call with Priya. Interested in 20 casino titles for the web platform; wants pricing by Friday.", dealId: bluebay, occurredAt: new Date(Date.now() - 2 * DAY).toISOString() });

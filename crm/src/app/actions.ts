@@ -23,6 +23,7 @@ import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord,
 import { requireActor, signInAs, signOut } from "@/lib/session";
 import { GATE_COOKIE, gateToken, passwordMatches, safeNext } from "@/lib/site-gate";
 import { applyKironPipeline } from "@/lib/kiron-pipeline";
+import { addDealButton, removeDealButton, type DealButton } from "@/lib/settings";
 import { addRequirement, addTransition, markAllRead, removeRequirement, removeTransition, type RequirementInput } from "@/lib/stage-rules-admin";
 
 // Every action checks who is signed in, then calls the same tested functions the
@@ -313,6 +314,20 @@ export async function applyKironPipelineAction(): Promise<ActionResult> {
   const res = await attempt(async () => {
     await applyKironPipeline(actor);
   });
+  refresh();
+  return res;
+}
+
+export async function addDealButtonAction(input: DealButton): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => addDealButton(actor, input));
+  refresh();
+  return res;
+}
+
+export async function removeDealButtonAction(label: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => removeDealButton(actor, label));
   refresh();
   return res;
 }

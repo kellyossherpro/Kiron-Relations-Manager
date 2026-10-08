@@ -31,6 +31,7 @@ export type PipelineConfig = {
   requirements: Requirement[];
   transitions: Transition[];
   fields: FieldSpec[]; // deal fields that exist right now (archived ones are left out)
+  companyFields: FieldSpec[]; // company fields, for "the contracting company has …" requirements
 };
 
 export type DealSnapshot = {
@@ -39,6 +40,7 @@ export type DealSnapshot = {
   contactRoles: string[];
   hasPrimaryCompany: boolean;
   collaboratorCount: number;
+  companyValues?: Record<string, unknown>; // the contracting company's fields
 };
 
 export type CheckedRequirement = { id: string; label: string; met: boolean };
@@ -63,9 +65,10 @@ export function conditionText(cfg: PipelineConfig, whenField: string | null, whe
 
 export function requirementLabel(cfg: PipelineConfig, r: Requirement) {
   let base: string;
-  if (r.kind === "field") {
-    base = cfg.fields.find((f) => f.key === r.fieldKey)?.label ?? "A hidden field";
+  if (r.kind === "field" || r.kind === "company_field") {
+    base = (r.kind === "field" ? cfg.fields : cfg.companyFields).find((f) => f.key === r.fieldKey)?.label ?? "A hidden field";
     if (r.requiredValues?.length) base += ` is ${r.requiredValues.join(" or ")}`;
+    if (r.kind === "company_field") base += " (on the contracting company)";
   }
   else if (r.kind === "has_contact") base = r.contactRole ? `${DEAL_CONTACT_ROLE_LABEL[r.contactRole] ?? r.contactRole} contact added` : "A contact added";
   else if (r.kind === "has_primary_company") base = "Contracting company set";
@@ -81,17 +84,19 @@ function applies(values: Record<string, unknown>, whenField: string | null, when
 export function evaluate(deal: DealSnapshot, cfg: PipelineConfig): Evaluation {
   const stage = cfg.stages.find((s) => s.key === deal.stageKey);
   const known = new Set(cfg.fields.map((f) => f.key));
+  const knownCompany = new Set(cfg.companyFields.map((f) => f.key));
   const reqs = cfg.requirements
     .filter((r) => r.stageKey === deal.stageKey)
     // A requirement on a field that's been hidden is ignored rather than blocking deals forever.
     .filter((r) => r.kind !== "field" || (r.fieldKey !== null && known.has(r.fieldKey)))
+    .filter((r) => r.kind !== "company_field" || (r.fieldKey !== null && knownCompany.has(r.fieldKey)))
     .filter((r) => applies(deal.values, r.whenField, r.whenValue))
     .sort((a, b) => a.position - b.position);
 
   const checked = reqs.map<CheckedRequirement>((r) => {
     let met: boolean;
-    if (r.kind === "field") {
-      const v = deal.values[r.fieldKey!];
+    if (r.kind === "field" || r.kind === "company_field") {
+      const v = r.kind === "field" ? deal.values[r.fieldKey!] : deal.companyValues?.[r.fieldKey!];
       met = r.requiredValues?.length ? r.requiredValues.some((want) => valueMatches(v, want)) : isFilled(v);
     }
     else if (r.kind === "has_contact") met = r.contactRole ? deal.contactRoles.includes(r.contactRole) : deal.contactRoles.length > 0;
@@ -116,7 +121,7 @@ export function evaluate(deal: DealSnapshot, cfg: PipelineConfig): Evaluation {
 type Q = Tx | typeof db;
 
 export async function loadPipelineConfig(q: Q): Promise<PipelineConfig> {
-  const [stages, reqs, trans, defs] = await Promise.all([
+  const [stages, reqs, trans, defs, companyDefs] = await Promise.all([
     q.execute(sql`select key, label, kind, position from pipeline_stages order by position`),
     q.execute(sql`
       select id, stage_key as "stageKey", kind, field_key as "fieldKey", contact_role as "contactRole",
@@ -126,26 +131,33 @@ export async function loadPipelineConfig(q: Q): Promise<PipelineConfig> {
       select id, from_stage as "fromStage", to_stage as "toStage", when_field as "whenField", when_value as "whenValue", position
       from stage_transitions order by from_stage, position, created_at`),
     q.execute(sql`
-      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", archived
+      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, archived
       from property_definitions where object_type = 'deal'`),
+    q.execute(sql`
+      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, archived
+      from property_definitions where object_type = 'company'`),
   ]);
   return {
     stages: stages.rows as Stage[],
     requirements: reqs.rows as Requirement[],
     transitions: trans.rows as Transition[],
     fields: fieldsFor("deal", defs.rows as never),
+    companyFields: fieldsFor("company", companyDefs.rows as never),
   };
 }
 
 export async function snapshotDeal(q: Q, row: Record<string, unknown>, cfg: PipelineConfig): Promise<DealSnapshot> {
   const id = row.id as string;
-  const [roles, collabs] = await Promise.all([
+  const [roles, collabs, company] = await Promise.all([
     q.execute(sql`
       select distinct dc.role from deal_contacts dc join contacts c on c.id = dc.contact_id
       where dc.deal_id = ${id} and c.deleted_at is null`),
     q.execute(sql`select count(*)::int as n from deal_collaborators where deal_id = ${id}`),
+    q.execute(sql`select * from companies where id = ${(row.primary_company_id as string | null) ?? null} and deleted_at is null`),
   ]);
+  const companyRow = company.rows[0];
   return {
+    companyValues: companyRow ? Object.fromEntries(cfg.companyFields.map((f) => [f.key, readFieldValue(companyRow as never, f)])) : {},
     stageKey: row.stage_key as string,
     values: Object.fromEntries(cfg.fields.map((f) => [f.key, readFieldValue(row as never, f)])),
     contactRoles: roles.rows.map((r) => r.role as string),
@@ -165,11 +177,13 @@ export async function evaluateDeal(dealId: string) {
 export async function missingByDeal(): Promise<Record<string, { missing: number; total: number }>> {
   const cfg = await loadPipelineConfig(db);
   if (cfg.requirements.length === 0) return {};
-  const [deals, roles, collabs] = await Promise.all([
+  const [deals, roles, collabs, companies] = await Promise.all([
     db.execute(sql`select * from deals where deleted_at is null`),
     db.execute(sql`select dc.deal_id, dc.role from deal_contacts dc join contacts c on c.id = dc.contact_id where c.deleted_at is null`),
     db.execute(sql`select deal_id, count(*)::int as n from deal_collaborators group by deal_id`),
+    db.execute(sql`select * from companies where deleted_at is null`),
   ]);
+  const companyById = new Map(companies.rows.map((c) => [c.id as string, c]));
   const rolesBy = new Map<string, string[]>();
   for (const r of roles.rows) rolesBy.set(r.deal_id as string, [...(rolesBy.get(r.deal_id as string) ?? []), r.role as string]);
   const collabsBy = new Map(collabs.rows.map((r) => [r.deal_id as string, r.n as number]));
@@ -183,6 +197,10 @@ export async function missingByDeal(): Promise<Record<string, { missing: number;
         contactRoles: rolesBy.get(id) ?? [],
         hasPrimaryCompany: !!row.primary_company_id,
         collaboratorCount: collabsBy.get(id) ?? 0,
+        companyValues: (() => {
+          const c = companyById.get(row.primary_company_id as string);
+          return c ? Object.fromEntries(cfg.companyFields.map((f) => [f.key, readFieldValue(c as never, f)])) : {};
+        })(),
       },
       cfg,
     );
@@ -205,6 +223,38 @@ export async function notify(q: Q, userIds: string[], n: { kind: string; dealId:
   }
 }
 
+/**
+ * The playbook: at Closed Won the account manager becomes the deal's owner. On direct deals the
+ * AM is the collaborator added at Proposal. With exactly one AM collaborating, KRM hands the deal
+ * over (the previous owner stays on as a collaborator); otherwise the owner is asked to pick one.
+ */
+export async function handOverToAccountManager(tx: Tx, dealId: string) {
+  const row = (await tx.execute(sql`
+    select d.id, d.name, d.owner_id, u.role as owner_role from deals d left join users u on u.id = d.owner_id where d.id = ${dealId}`)).rows[0];
+  if (!row || row.owner_role === "account_manager") return;
+  const ams = (await tx.execute(sql`
+    select u.id, u.name from deal_collaborators dc join users u on u.id = dc.user_id
+    where dc.deal_id = ${dealId} and u.role = 'account_manager' and u.active order by u.name`)).rows as { id: string; name: string }[];
+  const oldOwner = row.owner_id as string | null;
+  if (ams.length !== 1) {
+    const message =
+      ams.length === 0
+        ? `"${row.name}" reached Closed Won. Pick the account manager who'll own it: change the Owner in Details.`
+        : `"${row.name}" reached Closed Won with ${ams.length} account managers on it. Pick the one who'll own it: change the Owner in Details.`;
+    await notify(tx, oldOwner ? [oldOwner] : [], { kind: "handover_reminder", dealId, message });
+    return;
+  }
+  const am = ams[0];
+  await tx.execute(sql`update deals set owner_id = ${am.id}, version = version + 1, updated_at = now() where id = ${dealId}`);
+  await tx.execute(sql`delete from deal_collaborators where deal_id = ${dealId} and user_id = ${am.id}`);
+  if (oldOwner) await tx.execute(sql`insert into deal_collaborators (deal_id, user_id) values (${dealId}, ${oldOwner}) on conflict do nothing`);
+  await tx.execute(sql`
+    insert into audit_log (object_type, object_id, action, field, old_value, new_value, user_id)
+    values ('deal', ${dealId}, 'update', 'ownerId', ${JSON.stringify(oldOwner)}::jsonb, ${JSON.stringify(am.id)}::jsonb, null)`);
+  await notify(tx, [am.id], { kind: "handover_owner", dealId, message: `You now own "${row.name}": it reached Closed Won.` });
+  if (oldOwner) await notify(tx, [oldOwner], { kind: "handover_owner", dealId, message: `"${row.name}" is now owned by ${am.name}. You stay on it as a collaborator.` });
+}
+
 async function moveAutomatically(tx: Tx, row: Record<string, unknown>, to: Stage, reason: string, kind: string, at: Date) {
   const id = row.id as string;
   await tx.execute(sql`update deals set stage_key = ${to.key}, stage_entered_at = ${at.toISOString()}, version = version + 1, updated_at = now() where id = ${id}`);
@@ -217,6 +267,7 @@ async function moveAutomatically(tx: Tx, row: Record<string, unknown>, to: Stage
     stageKey: to.key,
     message: `"${row.name}" moved to ${to.label}: ${reason}`,
   });
+  if (to.kind === "won") await handOverToAccountManager(tx, id);
 }
 
 /**

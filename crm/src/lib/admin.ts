@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { FIELD_TYPES, OBJECT_TYPES, ROLES, type FieldType, type ObjectType, type Role } from "@/db/schema";
 import type { ShowWhen } from "./conditions";
 import { PermissionError, RuleError, translateDbError } from "./errors";
-import { fieldsFor, PROP_PREFIX } from "./fields";
+import { fieldsFor, PROP_PREFIX, type Derive } from "./fields";
 import { canManageUsersAndFields, type Actor } from "./permissions";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -71,7 +71,21 @@ export type FieldDefinitionInput = {
   groupLabel?: string | null;
   extraEditorRoles?: string[];
   showWhen?: ShowWhen | null;
+  derive?: Derive | null;
 };
+
+// "Filled in by itself from <number field>": the source must be a number or money field and
+// every range must give one of this field's options.
+async function cleanDerive(objectType: ObjectType, type: FieldType, options: string[], derive: Derive | null | undefined): Promise<Derive | null> {
+  if (!derive) return null;
+  const defs = await db.execute(sql`select key, label, type, options, archived from property_definitions where object_type = ${objectType}`);
+  const src = fieldsFor(objectType, defs.rows as never).find((f) => f.key === derive.from);
+  if (!src || !["number", "money"].includes(src.type)) throw new RuleError("A field can only be filled in from a number or money field.");
+  if (type !== "select") throw new RuleError("Only a dropdown field can be filled in from ranges.");
+  const ranges = derive.ranges.filter((r) => Number.isFinite(r.min) && r.value);
+  if (!ranges.length || !ranges.every((r) => options.includes(r.value))) throw new RuleError("Each range needs one of the field's options.");
+  return { from: src.key, ranges };
+}
 
 // "Only show when <field> is <answer>": the other field must be one with set answers.
 async function cleanShowWhen(objectType: ObjectType, ownKey: string, showWhen: ShowWhen | null | undefined): Promise<ShowWhen | null> {
@@ -103,12 +117,14 @@ export async function createFieldDefinition(actor: Actor, input: FieldDefinition
   const options = cleanOptions(input.type, input.options);
   const roles = (input.extraEditorRoles ?? []).filter((r) => (ROLES as readonly string[]).includes(r));
   const showWhen = await cleanShowWhen(input.objectType, key, input.showWhen);
+  const derive = await cleanDerive(input.objectType, input.type, options, input.derive);
   try {
     const pos = await db.execute(sql`select coalesce(max(position), 0) + 1 as p from property_definitions where object_type = ${input.objectType}`);
     const res = await db.execute(sql`
-      insert into property_definitions (object_type, key, label, type, options, group_label, position, extra_editor_roles, show_when)
+      insert into property_definitions (object_type, key, label, type, options, group_label, position, extra_editor_roles, show_when, derive)
       values (${input.objectType}, ${key}, ${label}, ${input.type}, ${JSON.stringify(options)}::jsonb, ${input.groupLabel?.trim() || null},
-              ${pos.rows[0].p as number}, ${JSON.stringify(roles)}::jsonb, ${showWhen ? JSON.stringify(showWhen) : null}::jsonb)
+              ${pos.rows[0].p as number}, ${JSON.stringify(roles)}::jsonb, ${showWhen ? JSON.stringify(showWhen) : null}::jsonb,
+              ${derive ? JSON.stringify(derive) : null}::jsonb)
       returning id`);
     return res.rows[0].id as string;
   } catch (err) {
