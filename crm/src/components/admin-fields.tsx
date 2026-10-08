@@ -12,12 +12,37 @@ const TYPE_LABEL: Record<FieldType, string> = {
 const OBJECT_LABEL: Record<ObjectType, string> = { deal: "Deals", company: "Companies", contact: "Contacts" };
 
 type ShowWhen = { field: string; values: string[] } | null;
-type Def = { id: string; objectType: ObjectType; key: string; label: string; type: FieldType; options: string[]; groupLabel: string | null; extraEditorRoles: string[]; showWhen?: ShowWhen; derive?: { from: string; ranges: { min: number; value: string }[] } | null; archived: boolean };
-type SaveInput = { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: ShowWhen; archived?: boolean };
+type Def = {
+  id: string; objectType: ObjectType; key: string; label: string; type: FieldType; options: string[]; groupLabel: string | null; extraEditorRoles: string[];
+  showWhen?: ShowWhen; derive?: { from: string; ranges: { min: number; value: string }[] } | null; editTeam?: string | null; commercial?: boolean; archived: boolean;
+};
+type SaveInput = { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: ShowWhen; editTeamId?: string | null; commercial?: boolean; archived?: boolean };
+type TeamOption = { id: string; name: string };
+
+// "Who fills it in": the usual people, or only one department or group (a sign-off).
+function WhoFillsIn({ id, teams, value, onChange }: { id: string; teams: TeamOption[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="label" htmlFor={id}>Who fills it in</label>
+      <select id={id} className="input" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Whoever can edit the record</option>
+        {teams.map((t) => <option key={t.id} value={t.id}>Only {t.name} (a sign-off)</option>)}
+      </select>
+    </div>
+  );
+}
+
+function FeesBox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /> Fees and rates: hidden from people who don&apos;t see commercial terms
+    </label>
+  );
+}
 
 const answersOf = (d: Def) => (d.type === "yesno" ? ["Yes", "No"] : d.options);
 
-export function AdminFields({ defs }: { defs: Def[] }) {
+export function AdminFields({ defs, teams }: { defs: Def[]; teams: TeamOption[] }) {
   const router = useRouter();
   const [objectType, setObjectType] = useState<ObjectType>("deal");
   const [label, setLabel] = useState("");
@@ -25,6 +50,8 @@ export function AdminFields({ defs }: { defs: Def[] }) {
   const [options, setOptions] = useState("");
   const [group, setGroup] = useState("");
   const [legal, setLegal] = useState(false);
+  const [team, setTeam] = useState("");
+  const [fees, setFees] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const needsOptions = type === "select" || type === "multiselect";
@@ -54,7 +81,7 @@ export function AdminFields({ defs }: { defs: Def[] }) {
       {list.length === 0 ? <p className="text-sm text-muted">No extra fields on {OBJECT_LABEL[objectType].toLowerCase()} yet. The built-in ones (name, owner and so on) are always there.</p> : (
         <ul className="space-y-2">
           {list.map((d) => (
-            <FieldRow key={d.id} d={d} others={list.filter((o) => o.id !== d.id && !o.archived && ["select", "multiselect", "yesno"].includes(o.type))} pending={pending} onSave={(input) => run(() => updateFieldAction(d.id, input))} />
+            <FieldRow key={d.id} d={d} teams={teams} others={list.filter((o) => o.id !== d.id && !o.archived && ["select", "multiselect", "yesno"].includes(o.type))} pending={pending} onSave={(input) => run(() => updateFieldAction(d.id, input))} />
           ))}
         </ul>
       )}
@@ -64,8 +91,8 @@ export function AdminFields({ defs }: { defs: Def[] }) {
         onSubmit={(e) => {
           e.preventDefault();
           run(
-            () => createFieldAction({ objectType, label, type, options: options.split("\n"), groupLabel: group, extraEditorRoles: legal ? ["legal"] : [] }),
-            () => { setLabel(""); setOptions(""); },
+            () => createFieldAction({ objectType, label, type, options: options.split("\n"), groupLabel: group, extraEditorRoles: legal ? ["legal"] : [], editTeamId: team || null, commercial: fees }),
+            () => { setLabel(""); setOptions(""); setTeam(""); setFees(false); },
           );
         }}
       >
@@ -84,6 +111,10 @@ export function AdminFields({ defs }: { defs: Def[] }) {
           <div><label className="label" htmlFor="fd-options">Options, one per line</label><textarea id="fd-options" className="input" rows={4} value={options} onChange={(e) => setOptions(e.target.value)} /></div>
         )}
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={legal} onChange={(e) => setLegal(e.target.checked)} /> Legal can edit this field on any deal</label>
+        <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
+          <WhoFillsIn id="fd-team" teams={teams} value={team} onChange={setTeam} />
+          <FeesBox checked={fees} onChange={setFees} />
+        </div>
         <button className="btn-primary" disabled={pending || !label.trim()}>Add field</button>
       </form>
       {msg && <p className="mt-3 text-sm text-danger" role="alert">{msg}</p>}
@@ -91,12 +122,15 @@ export function AdminFields({ defs }: { defs: Def[] }) {
   );
 }
 
-function FieldRow({ d, others, pending, onSave }: { d: Def; others: Def[]; pending: boolean; onSave: (input: SaveInput) => void }) {
+function FieldRow({ d, teams, others, pending, onSave }: { d: Def; teams: TeamOption[]; others: Def[]; pending: boolean; onSave: (input: SaveInput) => void }) {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(d.label);
   const [options, setOptions] = useState(d.options.join("\n"));
   const [group, setGroup] = useState(d.groupLabel ?? "");
   const [legal, setLegal] = useState(d.extraEditorRoles.includes("legal"));
+  const [team, setTeam] = useState(d.editTeam ?? "");
+  const [fees, setFees] = useState(!!d.commercial);
+  const teamName = teams.find((t) => t.id === d.editTeam)?.name;
   const [whenField, setWhenField] = useState(d.showWhen?.field ?? "");
   const [whenValues, setWhenValues] = useState<string[]>(d.showWhen?.values ?? []);
   const controller = others.find((o) => `p.${o.key}` === whenField);
@@ -109,6 +143,12 @@ function FieldRow({ d, others, pending, onSave }: { d: Def; others: Def[]; pendi
           <div>
             <span className="font-bold">{d.label}</span>
             <span className="ml-2 text-xs text-muted">{TYPE_LABEL[d.type]}{d.groupLabel ? ` · ${d.groupLabel}` : ""}{d.extraEditorRoles.includes("legal") ? " · Legal can edit" : ""}{d.archived ? " · Hidden" : ""}</span>
+            {(teamName || d.commercial) && (
+              <span className="ml-2 inline-flex gap-1 align-middle">
+                {teamName && <span className="rounded-full bg-warn-soft px-2 text-xs font-bold text-warn">Signed off by {teamName}</span>}
+                {d.commercial && <span className="rounded-full bg-brand-soft px-2 text-xs font-bold text-brand-dark">Fees &amp; rates</span>}
+              </span>
+            )}
             {d.derive && (
               <p className="text-xs text-muted">
                 Fills in by itself:{" "}
@@ -131,6 +171,10 @@ function FieldRow({ d, others, pending, onSave }: { d: Def; others: Def[]; pendi
           </div>
           {hasOptions && <textarea className="input" aria-label="Options, one per line" rows={4} value={options} onChange={(e) => setOptions(e.target.value)} />}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={legal} onChange={(e) => setLegal(e.target.checked)} /> Legal can edit this field</label>
+          <div className="grid gap-2 sm:grid-cols-2 sm:items-end">
+            <WhoFillsIn id={`team-${d.id}`} teams={teams} value={team} onChange={setTeam} />
+            <FeesBox checked={fees} onChange={setFees} />
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <label className="label" htmlFor={`sw-${d.id}`}>Only show when (optional)</label>
@@ -155,7 +199,7 @@ function FieldRow({ d, others, pending, onSave }: { d: Def; others: Def[]; pendi
           </div>
           <p className="text-xs text-muted">The type can&apos;t change once a field exists, so existing values stay valid.</p>
           <div className="flex gap-2">
-            <button className="btn-dark" disabled={pending} onClick={() => { onSave({ label, groupLabel: group, options: hasOptions ? options.split("\n") : undefined, extraEditorRoles: legal ? ["legal"] : [], showWhen: whenField ? { field: whenField, values: whenValues } : null }); setEditing(false); }}>Save</button>
+            <button className="btn-dark" disabled={pending} onClick={() => { onSave({ label, groupLabel: group, options: hasOptions ? options.split("\n") : undefined, extraEditorRoles: legal ? ["legal"] : [], showWhen: whenField ? { field: whenField, values: whenValues } : null, editTeamId: team || null, commercial: fees }); setEditing(false); }}>Save</button>
             <button className="btn-ghost" onClick={() => setEditing(false)}>Cancel</button>
           </div>
         </div>

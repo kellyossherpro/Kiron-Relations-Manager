@@ -46,6 +46,9 @@ src/lib/addendums.ts    the addendum loop: raise on a live deal, mark done or ca
 src/lib/kiron-pipeline.ts  the sales playbook as fields + stage rules (Admin → "Set up the playbook's rules")
 src/lib/conditions.ts   answer matching shared by stage rules and forms ("only show when")
 src/lib/settings.ts     company-wide settings (buttons on deals)
+src/lib/teams.ts        departments and groups; "Set up Kiron's people" (from kiron-org.ts)
+src/lib/kiron-org.ts    Kiron's departments, people, job titles (organogram; never emails or phones)
+src/lib/view.ts         what a page may show this person (fields, values, history)
 src/lib/links.ts        contacts↔companies, deal contacts with roles, collaborators
 src/lib/activities.ts   notes, calls, meetings, tasks
 src/lib/admin.ts        first admin, people, field definitions
@@ -79,6 +82,14 @@ Rules that matter:
   from the monthly amount); nobody can type it. A requirement can check the contracting company's fields
   ("company_field"), and saving a company re-checks its deals. At Closed Won the deal is handed to its one
   account manager collaborator (the previous owner stays as collaborator); otherwise the owner is reminded.
+- **Departments and groups** (`teams`, `team_members`): a person can be in several. "Set up Kiron's people"
+  adds the organogram's departments and people without emails (matched to Microsoft accounts at first sign-in),
+  with a starting role by department; it only adds what's missing. A field can be **signed off** by one
+  department or group only (`edit_team_id`, e.g. Technical review performed → Technical reviewers); everyone
+  in the group is notified when a deal reaches a stage waiting on it, and it shows on their My tasks. Admins
+  can always step in. Add backups to the group for holidays.
+- **Fees and rates** (`commercial` fields) are left out of the page, the values and the history for viewers,
+  unless one of their departments "can see fees and rates" (Finance). Other roles always see them.
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.
 - **Sign-in** is a development picker (`AUTH_MODE=dev`). Microsoft sign-in replaces it before go-live.
 

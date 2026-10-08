@@ -15,8 +15,8 @@ export async function listStages() {
 
 export async function listUsers(includeInactive = false) {
   const res = await db.execute(sql`
-    select id, name, email, role, active from users ${includeInactive ? sql`` : sql`where active`} order by name`);
-  return res.rows as { id: string; name: string; email: string; role: string; active: boolean }[];
+    select id, name, email, title, role, active from users ${includeInactive ? sql`` : sql`where active`} order by name`);
+  return res.rows as { id: string; name: string; email: string | null; title: string | null; role: string; active: boolean }[];
 }
 
 export async function companyOptions(): Promise<Option[]> {

@@ -4,23 +4,28 @@ import { AdminStageRules } from "@/components/admin-stage-rules";
 import { kironPipelineSummary } from "@/lib/kiron-pipeline";
 import { conditionText, loadPipelineConfig, requirementLabel } from "@/lib/stage-engine";
 import { db } from "@/db";
+import { AdminTeams } from "@/components/admin-teams";
 import { AdminUsers } from "@/components/admin-users";
 import { canManageUsersAndFields } from "@/lib/permissions";
 import { listDefinitions, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
 import { dealButtons } from "@/lib/settings";
+import { kironOrgSetUp, listTeams, teamNamesByUser } from "@/lib/teams";
 
 export const metadata = { title: "Admin" };
 
 export default async function AdminPage() {
   const actor = await requireActor();
   if (!canManageUsersAndFields(actor)) return <p>Only admins can see this page.</p>;
-  const [users, defs, cfg, buttons] = await Promise.all([listUsers(true), listDefinitions(undefined, true), loadPipelineConfig(db), dealButtons()]);
+  const [users, defs, cfg, buttons, teams, teamNames, kironSetUp] = await Promise.all([
+    listUsers(true), listDefinitions(undefined, true), loadPipelineConfig(db), dealButtons(), listTeams(), teamNamesByUser(), kironOrgSetUp(),
+  ]);
   return (
     <div className="space-y-5">
       <h1 className="h1">Admin</h1>
-      <AdminUsers users={users} meId={actor.id} />
-      <AdminFields defs={defs} />
+      <AdminUsers users={users.map((u) => ({ ...u, teams: teamNames[u.id] ?? [] }))} meId={actor.id} />
+      <AdminTeams teams={teams} kironSetUp={kironSetUp} people={users.filter((u) => u.active).map((u) => ({ id: u.id, label: u.title ? `${u.name} · ${u.title}` : u.name }))} />
+      <AdminFields defs={defs} teams={teams.map((t) => ({ id: t.id, name: t.name }))} />
       <AdminStageRules
         playbook={kironPipelineSummary()}
         stages={cfg.stages}

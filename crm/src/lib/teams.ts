@@ -117,6 +117,13 @@ export async function ensureGroup(name: string): Promise<string> {
   return res.rows[0].id as string;
 }
 
+// Whether "Set up Kiron's people" has been run: all of the organogram's departments are here.
+export async function kironOrgSetUp(): Promise<boolean> {
+  const names = KIRON_ORG.map((d) => d.name.toLowerCase());
+  const res = await db.execute(sql`select count(*)::int as n from teams where lower(name) in (${sql.join(names.map((n) => sql`${n}`), sql`, `)})`);
+  return (res.rows[0].n as number) === names.length;
+}
+
 export type OrgSetupResult = { departments: number; peopleAdded: number; peopleFound: number };
 
 /**

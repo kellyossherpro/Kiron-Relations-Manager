@@ -7,8 +7,9 @@ import { logActivity } from "@/lib/activities";
 import { applyKironPipeline } from "@/lib/kiron-pipeline";
 import { addCollaborator, addDealContact, linkContactToCompany } from "@/lib/links";
 import type { Actor } from "@/lib/permissions";
-import { createRecord, updateRecord } from "@/lib/records";
-import { runDailyRules } from "@/lib/stage-engine";
+import { createRecord, updateRecord, withTx } from "@/lib/records";
+import { askForSignOffs, runDailyRules } from "@/lib/stage-engine";
+import { addTeamMember, createTeam, TECH_REVIEWERS, updateTeam } from "@/lib/teams";
 
 // Fills an EMPTY database with a made-up company's CRM, for demos and the tour:
 //   npm run example:load    (refuses if there is any data)
@@ -25,9 +26,10 @@ async function isEmpty() {
 }
 
 export async function clearExampleData() {
-  const real = await db.execute(sql`select count(*)::int as n from users where email not like '%@example.test'`);
+  // People loaded from the organogram have no email, so they count as real too.
+  const real = await db.execute(sql`select count(*)::int as n from users where email is null or email not like '%@example.test'`);
   if ((real.rows[0].n as number) > 0) throw new Error("This database has people who aren't example users. Not clearing it.");
-  await db.execute(sql`truncate addendums, notifications, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
+  await db.execute(sql`truncate addendums, notifications, team_members, teams, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
   await db.execute(sql`delete from stage_requirements; delete from app_settings`);
   await db.execute(sql`delete from stage_transitions`);
   await db.execute(sql`
@@ -53,11 +55,31 @@ export async function loadExampleData() {
   const sam = await user(admin, "Sam Sales", "sales");
   const jo = await user(admin, "Jo Sales", "sales");
   const alex = await user(admin, "Alex Account-Manager", "account_manager");
-  await user(admin, "Morgan Manager", "manager");
-  await user(admin, "Lee Legal", "legal");
+  const morgan = await user(admin, "Morgan Manager", "manager");
+  const lee = await user(admin, "Lee Legal", "legal");
+  const rae = await user(admin, "Rae Reviewer", "viewer"); // signs off technical reviews
+  const fran = await user(admin, "Fran Finance", "viewer"); // reads, and sees fees and rates
+  const sky = await user(admin, "Sky Support", "viewer"); // reads, but not fees and rates
 
   // The sales playbook's fields and stage rules, as an admin would set them up in one click
   await applyKironPipeline(admin);
+
+  // Departments and groups (made-up ones; Kiron's real ones come from "Set up Kiron's people")
+  for (const [name, members] of [
+    ["Sales", [sam, jo]],
+    ["Account Management", [admin, alex]],
+    ["Commercial", [morgan]],
+    ["Risk, Legal, & Compliance", [lee]],
+    ["Development", [rae]],
+    ["Finance", [fran]],
+    ["Support & Installations", [sky]],
+  ] as const) {
+    const id = (await createTeam(admin, { name, kind: "department" }))!;
+    for (const m of members) await addTeamMember(admin, id, m.id);
+    if (name === "Finance") await updateTeam(admin, id, { seesCommercials: true });
+  }
+  const reviewers = (await db.execute(sql`select id from teams where name = ${TECH_REVIEWERS}`)).rows[0].id as string;
+  await addTeamMember(admin, reviewers, rae.id);
 
   // Companies
   const co: Record<string, string> = {};
@@ -113,7 +135,10 @@ export async function loadExampleData() {
   const summit = await deal(sam, "Summit – Custom Racing Feed", "Summit Play Ltd", "45000", { "p.lead_source": "SBC Barcelona", "p.integration_type": CUSTOM });
   await addDealContact(sam, summit, ct.Aisha, "primary");
   await setStage(summit, "feasibility", 6);
-  const riverstone = await deal(jo, "Riverstone – Shop Estate Rollout", "Riverstone Entertainment Ltd", "22000", { "p.lead_source": "SBC Barcelona", "p.integration_type": VANILLA });
+  const riverstone = await deal(jo, "Riverstone – Shop Estate Rollout", "Riverstone Entertainment Ltd", "22000", {
+    "p.lead_source": "SBC Barcelona", "p.integration_type": VANILLA,
+    "p.setup_fee_usd": "2500", "p.monthly_minimum_amount_usd": "1500", "p.fee_rate_type": "Flat Rate", "p.flat_rate": 10, "p.based_on_ggr_ngr": "GGR",
+  });
   await setStage(riverstone, "proposal", 12);
   const bluebay2 = await deal(sam, "Bluebay – Sportsbook Add-on", "Bluebay Gaming Ltd", "15000", { "p.via_aggregator": false, "p.lead_source": "Independently sourced", "p.integration_type": VANILLA, "p.billing_currency": "EUR" });
   await setStage(bluebay2, "legal_compliance", 4);
@@ -155,6 +180,7 @@ export async function loadExampleData() {
   await updateRecord(sam, "deal", copperline, { "p.lead_source": "SBC Barcelona", amountMonthly: "6000" }, { "p.lead_source": null, amountMonthly: null }); // moves on
   await runDailyRules();
   await raiseAddendum(alex, live3, { type: "new_product", details: "Add the new scratchcard range to their site from next month." });
+  await withTx((tx) => askForSignOffs(tx, harbour)); // Harbour waits on the technical review
 
   return { deals: 15 };
 }
