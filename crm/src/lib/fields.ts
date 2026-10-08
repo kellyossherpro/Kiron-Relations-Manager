@@ -16,6 +16,8 @@ export type FieldSpec = {
   extraEditorRoles?: string[];
   showWhen?: ShowWhen | null;
   derive?: Derive | null;
+  editTeam?: string | null; // only this team's members fill it in (a sign-off)
+  commercial?: boolean; // fees and rates: hidden from people who don't see them
 };
 
 // A field KRM fills in from another one by ranges (Customer tier from the monthly amount).
@@ -63,6 +65,8 @@ export type PropertyDefinitionLike = {
   extraEditorRoles: string[];
   showWhen?: ShowWhen | null;
   derive?: Derive | null;
+  editTeam?: string | null;
+  commercial?: boolean;
   archived: boolean;
 };
 
@@ -78,6 +82,8 @@ export function fieldsFor(objectType: ObjectType, defs: PropertyDefinitionLike[]
       extraEditorRoles: d.extraEditorRoles,
       showWhen: d.showWhen ?? null,
       derive: d.derive ?? null,
+      editTeam: d.editTeam ?? null,
+      commercial: d.commercial ?? false,
     }));
   return [...CORE_FIELDS[objectType], ...custom];
 }

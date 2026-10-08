@@ -17,7 +17,7 @@ import { requireActor } from "@/lib/session";
 import { isShown } from "@/lib/conditions";
 import { dealButtons } from "@/lib/settings";
 import { evaluateDeal } from "@/lib/stage-engine";
-import { clientFields } from "@/lib/view";
+import { clientFields, visibleHistory, visibleRecord } from "@/lib/view";
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requireActor();
@@ -29,7 +29,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     if (e instanceof NotFoundError) notFound();
     throw e;
   }
-  const { row, specs, values } = record;
+  const { row, specs, values, hidden } = visibleRecord(actor, record);
   const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation, addendums, buttons] = await Promise.all([
     getDealLinks(id),
     listStages(),
@@ -161,7 +161,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           <details className="card p-5">
             <summary className="h2 cursor-pointer">History</summary>
             <div className="mt-3">
-              <HistoryList entries={history} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={stageLabels} names={names} moneyFields={specs.filter((s) => s.type === "money").map((s) => s.key)} />
+              <HistoryList entries={visibleHistory(history, hidden)} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={stageLabels} names={names} moneyFields={specs.filter((s) => s.type === "money").map((s) => s.key)} />
             </div>
           </details>
         </div>

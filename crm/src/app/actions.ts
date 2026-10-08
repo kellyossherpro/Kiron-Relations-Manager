@@ -23,6 +23,7 @@ import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord,
 import { requireActor, signInAs, signOut } from "@/lib/session";
 import { GATE_COOKIE, gateToken, passwordMatches, safeNext } from "@/lib/site-gate";
 import { applyKironPipeline } from "@/lib/kiron-pipeline";
+import { addTeamMember, applyKironOrg, createTeam, deleteTeam, removeTeamMember, updateTeam, type TeamKind } from "@/lib/teams";
 import { addDealButton, removeDealButton, type DealButton } from "@/lib/settings";
 import { addRequirement, addTransition, markAllRead, removeRequirement, removeTransition, type RequirementInput } from "@/lib/stage-rules-admin";
 
@@ -240,7 +241,7 @@ export async function deleteActivityAction(activityId: string): Promise<ActionRe
 
 // ---------- admin ----------
 
-export async function createUserAction(input: { name: string; email: string; role: Role }): Promise<ActionResult> {
+export async function createUserAction(input: { name: string; email?: string; role: Role; title?: string }): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => createUser(actor, input));
   revalidatePath("/admin");
@@ -262,6 +263,8 @@ export async function createFieldAction(input: {
   groupLabel?: string;
   extraEditorRoles?: string[];
   showWhen?: { field: string; values: string[] } | null;
+  editTeamId?: string | null;
+  commercial?: boolean;
 }): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => createFieldDefinition(actor, input));
@@ -271,10 +274,54 @@ export async function createFieldAction(input: {
 
 export async function updateFieldAction(
   id: string,
-  input: { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: { field: string; values: string[] } | null; archived?: boolean },
+  input: {
+    label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: { field: string; values: string[] } | null;
+    editTeamId?: string | null; commercial?: boolean; archived?: boolean;
+  },
 ): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => updateFieldDefinition(actor, id, input));
+  refresh();
+  return res;
+}
+
+// ---------- departments and groups ----------
+
+export async function applyKironOrgAction(): Promise<ActionResult & { message?: string }> {
+  const actor = await requireActor();
+  let message = "";
+  const res = await attempt(async () => {
+    const r = await applyKironOrg(actor);
+    message = `${r.departments} departments. ${r.peopleAdded} people added${r.peopleFound ? `, ${r.peopleFound} already here` : ""}.`;
+  });
+  refresh();
+  return { ...res, message };
+}
+
+export async function createTeamAction(input: { name: string; kind: TeamKind }): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => createTeam(actor, input));
+  refresh();
+  return res;
+}
+
+export async function updateTeamAction(teamId: string, input: { name?: string; seesCommercials?: boolean }): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => updateTeam(actor, teamId, input));
+  refresh();
+  return res;
+}
+
+export async function deleteTeamAction(teamId: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => deleteTeam(actor, teamId));
+  refresh();
+  return res;
+}
+
+export async function setTeamMemberAction(teamId: string, userId: string, member: boolean): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => (member ? addTeamMember(actor, teamId, userId) : removeTeamMember(actor, teamId, userId)));
   refresh();
   return res;
 }

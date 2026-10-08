@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db, pool } from "@/db";
-import { makeUser, resetDb } from "@/test/helpers";
+import { joinTeam, makeUser, resetDb } from "@/test/helpers";
 import { createFieldDefinition, updateFieldDefinition } from "./admin";
 import { PermissionError, RuleError } from "./errors";
 import { applyKironPipeline, KIRON_FIELDS, kironPipelineSummary } from "./kiron-pipeline";
@@ -60,10 +60,12 @@ async function setUp() {
   const am = await makeUser("account_manager");
   const legal = await makeUser("legal");
   await applyKironPipeline(admin);
+  // Signs off the technical review; read-only otherwise, like most of the Dev team.
+  const reviewer = await joinTeam(await makeUser("viewer", "Rae Reviewer"), "Technical reviewers");
   const company = await createRecord(sales, "company", { name: "Example Operator Ltd" });
   const person = await createRecord(sales, "contact", { firstName: "Ola", lastName: "Example", email: "ola@example.test" });
   const deal = await createRecord(sales, "deal", { name: "Example Operator – BetMan Retail" });
-  return { admin, sales, am, legal, company, person, deal };
+  return { admin, sales, am, legal, reviewer, company, person, deal };
 }
 
 // Lead → Customer Engagement → Qualified Lead, the same for every route.
@@ -130,9 +132,16 @@ describe("a deal through Kiron's pipeline", () => {
     const s = await setUp();
     await toQualifiedLead(s);
 
-    await fill(s.sales, s.deal, { ...QUALIFIED_VANILLA, "p.technical_review_performed": false });
+    await fill(s.sales, s.deal, QUALIFIED_VANILLA);
+    expect(await missing(s.deal)).toEqual(["Technical review performed is Yes"]);
+    // Only the technical reviewers sign it off, and they're told it's waiting for them.
+    await expect(fill(s.sales, s.deal, { "p.technical_review_performed": true })).rejects.toThrow(PermissionError);
+    expect((await listNotifications(s.reviewer.id)).map((n) => n.message)).toEqual([
+      `"Example Operator – BetMan Retail" needs your sign-off: Technical review performed (Qualified Lead).`,
+    ]);
+    await fill(s.reviewer, s.deal, { "p.technical_review_performed": false });
     expect(await missing(s.deal)).toEqual(["Technical review performed is Yes"]); // "No" holds it back
-    await updateRecord(s.sales, "deal", s.deal, { "p.technical_review_performed": true }, { "p.technical_review_performed": false });
+    await updateRecord(s.reviewer, "deal", s.deal, { "p.technical_review_performed": true }, { "p.technical_review_performed": false });
     expect(await stageOf(s.deal)).toBe("proposal"); // vanilla skips Feasibility
 
     await fill(s.sales, s.deal, { "p.proposal_sent_to_client": true, "p.proposal_accepted_by_client": "Yes", "p.via_aggregator": false });
@@ -168,7 +177,8 @@ describe("a deal through Kiron's pipeline", () => {
     const s = await setUp();
     const aggregator = await createRecord(s.sales, "company", { name: "Example Aggregator Ltd" });
     await toQualifiedLead(s);
-    await fill(s.sales, s.deal, { ...QUALIFIED_VANILLA, "p.technical_review_performed": true });
+    await fill(s.sales, s.deal, QUALIFIED_VANILLA);
+    await fill(s.reviewer, s.deal, { "p.technical_review_performed": true });
 
     await fill(s.sales, s.deal, { "p.proposal_sent_to_client": false, "p.proposal_accepted_by_client": "No proposal needed", "p.via_aggregator": true });
     expect(await missing(s.deal)).toEqual(["Aggregator (when Via aggregator is Yes)"]); // no collaborator needed
@@ -191,7 +201,8 @@ describe("a deal through Kiron's pipeline", () => {
   it("custom route: Feasibility (RICE) until the RICE board approves", async () => {
     const s = await setUp();
     await toQualifiedLead(s);
-    await fill(s.sales, s.deal, { ...QUALIFIED_VANILLA, "p.integration_type": "A Bespoke (Custom) Integration", "p.technical_review_performed": true });
+    await fill(s.sales, s.deal, { ...QUALIFIED_VANILLA, "p.integration_type": "A Bespoke (Custom) Integration" });
+    await fill(s.reviewer, s.deal, { "p.technical_review_performed": true });
     expect(await stageOf(s.deal)).toBe("feasibility");
     await fill(s.sales, s.deal, { "p.rice_analysis_needed": true, "p.rice_full_report_link": "portal.example.test/rice/1", "p.rice_board_decision": "Rejected" });
     expect(await missing(s.deal)).toEqual(["RICE board decision is Approved"]);
@@ -204,13 +215,13 @@ describe("a deal through Kiron's pipeline", () => {
     await toQualifiedLead(s);
     await fill(s.sales, s.deal, {
       ...QUALIFIED_VANILLA,
-      "p.technical_review_performed": true,
       "p.fee_rate_type": "Variable Rate",
       "p.flat_rate": null,
       "p.dedicated_server": true,
       "p.distribution_platform": "3rd Party",
       "p.termination_period": "Custom Period",
     });
+    await fill(s.reviewer, s.deal, { "p.technical_review_performed": true });
     expect(await missing(s.deal)).toEqual([
       "3rd party name (when Distribution platform is 3rd Party)",
       "Server name (when Dedicated server is Yes)",

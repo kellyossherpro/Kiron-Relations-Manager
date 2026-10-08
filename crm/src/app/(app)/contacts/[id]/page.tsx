@@ -10,7 +10,7 @@ import { DEAL_CONTACT_ROLE_LABEL } from "@/lib/format";
 import { canDelete, canEditRecord, canLogActivity, isManager } from "@/lib/permissions";
 import { companyOptions, getContactRelations, getRecord, listActivities, listHistory, listStages, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
-import { clientFields } from "@/lib/view";
+import { clientFields, visibleHistory, visibleRecord } from "@/lib/view";
 
 export default async function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requireActor();
@@ -22,7 +22,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
     if (e instanceof NotFoundError) notFound();
     throw e;
   }
-  const { row, specs, values } = record;
+  const { row, specs, values, hidden } = visibleRecord(actor, record);
   const [rel, users, companies, activities, history, stages] = await Promise.all([
     getContactRelations(id), listUsers(), companyOptions(), listActivities({ contactId: id }), listHistory("contact", id), listStages(),
   ]);
@@ -82,7 +82,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           <details className="card p-5">
             <summary className="h2 cursor-pointer">History</summary>
             <div className="mt-3">
-              <HistoryList entries={history} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={Object.fromEntries(stages.map((s) => [s.key, s.label]))} names={names} moneyFields={specs.filter((s) => s.type === "money").map((s) => s.key)} />
+              <HistoryList entries={visibleHistory(history, hidden)} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={Object.fromEntries(stages.map((s) => [s.key, s.label]))} names={names} moneyFields={specs.filter((s) => s.type === "money").map((s) => s.key)} />
             </div>
           </details>
         </div>

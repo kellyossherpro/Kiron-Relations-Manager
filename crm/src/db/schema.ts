@@ -43,7 +43,11 @@ export const users = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
-    email: text("email").notNull(),
+    // Can be empty: people loaded from the organogram are matched to their Microsoft account
+    // when they first sign in. Never put staff emails in the repo (CLAUDE.md).
+    email: text("email"),
+    title: text("title"), // job title
+    reportsTo: text("reports_to"), // manager's name, as on the organogram
     role: text("role").$type<Role>().notNull().default("viewer"),
     active: boolean("active").notNull().default(true),
     ...timestamps,
@@ -179,6 +183,10 @@ export const propertyDefinitions = pgTable(
     // Filled in by KRM from another field by ranges, never typed (e.g. Customer tier from the
     // monthly amount). Ranges are checked from the highest "min" down.
     derive: jsonb("derive").$type<{ from: string; ranges: { min: number; value: string }[] }>(),
+    // Only members of this team can fill it in: a sign-off (e.g. Technical reviewers).
+    editTeamId: uuid("edit_team_id").references((): AnyPgColumn => teams.id, { onDelete: "set null" }),
+    // Fees and rates: hidden from people who don't see commercial terms.
+    commercial: boolean("commercial").notNull().default(false),
     archived: boolean("archived").notNull().default(false),
     ...timestamps,
   },
@@ -334,4 +342,30 @@ export const appSettings = pgTable("app_settings", {
   value: jsonb("value").$type<unknown>().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Departments (from the organogram) and groups of people with a job in KRM (e.g. the
+// technical reviewers who sign off a deal). A person can be in several.
+export const TEAM_KINDS = ["department", "group"] as const;
+export const teams = pgTable(
+  "teams",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    kind: text("kind").$type<(typeof TEAM_KINDS)[number]>().notNull().default("department"),
+    // Members see fees and rates even if their role wouldn't (e.g. Finance).
+    seesCommercials: boolean("sees_commercials").notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("teams_name_unique").on(sql`lower(${t.name})`)],
+);
+
+export const teamMembers = pgTable(
+  "team_members",
+  {
+    teamId: uuid("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.userId] }), index("team_members_user_idx").on(t.userId)],
+);
 

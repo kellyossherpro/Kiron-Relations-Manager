@@ -4,7 +4,7 @@ import type { ObjectType } from "@/db/schema";
 import { NotFoundError, PermissionError, RuleError, translateDbError } from "./errors";
 import { deriveValue, FieldError, fieldsFor, normalizeValue, PROP_PREFIX, readFieldValue, sameValue, type FieldSpec } from "./fields";
 import { canCreate, canDelete, canEditField, canMoveStage, OWNER_EXCEPTION_STAGES, type Actor } from "./permissions";
-import { autoAdvance, handOverToAccountManager } from "./stage-engine";
+import { askForSignOffs, autoAdvance, handOverToAccountManager } from "./stage-engine";
 
 export const TABLES: Record<ObjectType, string> = { company: "companies", contact: "contacts", deal: "deals" };
 
@@ -17,7 +17,7 @@ export type SaveResult = { status: "saved"; version: number; movedTo?: string[] 
 
 async function loadSpecs(tx: Tx | typeof db, objectType: ObjectType) {
   const res = await tx.execute(sql`
-    select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, archived
+    select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, edit_team_id as "editTeam", commercial, archived
     from property_definitions where object_type = ${objectType}`);
   return fieldsFor(objectType, res.rows as never);
 }
@@ -70,6 +70,10 @@ export async function createRecord(actor: Actor, objectType: ObjectType, values:
     for (const spec of specs) {
       const provided = Object.prototype.hasOwnProperty.call(values, spec.key);
       if (!provided && !spec.required) continue;
+      // Sign-offs and fees and rates: only the people allowed to fill them in.
+      if (provided && (spec.editTeam || spec.commercial) && !canEditField(actor, objectType, { ownerId: actor.id }, spec)) {
+        throw new PermissionError(`You can't fill in ${spec.label}.`);
+      }
       const v = normalizeValue(spec, provided ? values[spec.key] : null);
       if (v === null) continue;
       snapshot[spec.key] = v;
@@ -100,7 +104,7 @@ export async function createRecord(actor: Actor, objectType: ObjectType, values:
       returning id`);
     const id = res.rows[0].id as string;
     await audit(tx, actor, objectType, id, "create", null, null, snapshot);
-    if (objectType === "deal") await autoAdvance(tx, id);
+    if (objectType === "deal" && !(await autoAdvance(tx, id)).length) await askForSignOffs(tx, id);
     return id;
   });
 }
@@ -225,6 +229,7 @@ export async function moveDealStage(
       update addendums set status = 'cancelled', closed_by = ${actor.id}, closed_at = now(), close_note = ${`Deal moved to ${stage.rows[0].label} by hand: ${reason}`}
       where deal_id = ${dealId} and status = 'open'`);
     if (stage.rows[0].kind === "won") await handOverToAccountManager(tx, dealId);
+    await askForSignOffs(tx, dealId);
     return { status: "moved" };
   });
 }

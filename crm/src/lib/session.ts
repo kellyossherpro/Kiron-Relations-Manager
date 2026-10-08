@@ -24,9 +24,16 @@ export async function getActor(): Promise<Actor | null> {
   if (!devAuthEnabled()) return null;
   const id = (await cookies()).get(COOKIE)?.value;
   if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const res = await db.execute(sql`select id, name, role from users where id = ${id} and active`);
+  const res = await db.execute(sql`
+    select u.id, u.name, u.role,
+           coalesce(array_agg(t.id) filter (where t.id is not null), '{}') as team_ids,
+           coalesce(bool_or(t.sees_commercials), false) as sees
+    from users u left join team_members m on m.user_id = u.id left join teams t on t.id = m.team_id
+    where u.id = ${id} and u.active group by u.id`);
   const u = res.rows[0];
-  return u ? { id: u.id as string, name: u.name as string, role: u.role as Role } : null;
+  return u
+    ? { id: u.id as string, name: u.name as string, role: u.role as Role, teamIds: u.team_ids as string[], teamSeesCommercials: u.sees as boolean }
+    : null;
 }
 
 // Use at the top of every page and server action that needs a signed-in person.

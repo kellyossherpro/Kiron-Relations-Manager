@@ -7,6 +7,7 @@ import { PROP_PREFIX } from "./fields";
 import { COUNTRIES, PRODUCTS } from "./kiron-pipeline-options";
 import { canManageUsersAndFields, type Actor } from "./permissions";
 import { dealButtons, setSetting, type DealButton } from "./settings";
+import { ensureGroup, TECH_REVIEWERS } from "./teams";
 import { addRequirement, addTransition, type RequirementInput } from "./stage-rules-admin";
 
 // Kiron's pipeline as the sales playbook describes it (kiron-sales-playbook repo,
@@ -17,6 +18,8 @@ import { addRequirement, addTransition, type RequirementInput } from "./stage-ru
 // `shown`: only show the field when another field has one of these answers.
 // `company`: the field lives on the company (e.g. its registered address), not the deal.
 // `fromAmount`: filled in by KRM from the monthly amount by these minimums, never typed.
+// `fees`: fees and rates, hidden from people who don't see commercial terms (Q63).
+// `signedOffBy`: only this group fills it in (a sign-off).
 type FieldDef = {
   label: string;
   type: FieldType;
@@ -26,6 +29,8 @@ type FieldDef = {
   shown?: [string, string[]];
   company?: true;
   fromAmount?: [string, number][];
+  fees?: true;
+  signedOffBy?: string;
 };
 
 const G = {
@@ -47,9 +52,9 @@ const VARIABLE: [string, string[]] = ["Fee/rate type", ["Variable Rate"]];
 const CUSTOM_ONLY: [string, string[]] = ["Integration type", [CUSTOM]];
 const DIRECT_ONLY: [string, string[]] = ["Via aggregator", ["No"]];
 const tierFields: FieldDef[] = [1, 2, 3, 4, 5].flatMap((n) => [
-  { label: `Variable rate tier ${n} from (USD)`, type: "money" as const, group: G.fees, shown: VARIABLE },
-  { label: `Variable rate tier ${n} to (USD)`, type: "money" as const, group: G.fees, shown: VARIABLE },
-  { label: `Variable rate tier ${n} rate %`, type: "number" as const, group: G.fees, shown: VARIABLE },
+  { label: `Variable rate tier ${n} from (USD)`, type: "money" as const, group: G.fees, shown: VARIABLE, fees: true as const },
+  { label: `Variable rate tier ${n} to (USD)`, type: "money" as const, group: G.fees, shown: VARIABLE, fees: true as const },
+  { label: `Variable rate tier ${n} rate %`, type: "number" as const, group: G.fees, shown: VARIABLE, fees: true as const },
 ]);
 
 export const KIRON_FIELDS: FieldDef[] = [
@@ -80,8 +85,8 @@ export const KIRON_FIELDS: FieldDef[] = [
     fromAmount: [["Tier 1", 50_000], ["Tier 2", 10_000], ["Tier 3", 1_000], ["Tier 4", 0]], // Q42
   },
   { label: "B2B or B2C", type: "select", options: ["B2B", "B2C", "B2B and B2C"], group: G.money },
-  { label: "Setup fee (USD)", type: "money", group: G.money },
-  { label: "Monthly minimum amount (USD)", type: "money", group: G.money },
+  { label: "Setup fee (USD)", type: "money", group: G.money, fees: true },
+  { label: "Monthly minimum amount (USD)", type: "money", group: G.money, fees: true },
   { label: "Billing currency", type: "select", options: ["BRL", "EUR", "GBP", "USD", "ZAR"], group: G.money },
   { label: "Integration type", type: "select", options: ["A Generic (Vanilla) integration", CUSTOM], group: G.tech },
   { label: "Product (event type)", type: "multiselect", options: PRODUCTS, group: G.tech },
@@ -90,8 +95,8 @@ export const KIRON_FIELDS: FieldDef[] = [
   { label: "Picture solution", type: "select", options: ["Satellite", "Vision X", "In-Shop Render", "Streaming"], group: G.tech },
   { label: "Dedicated server", type: "yesno", group: G.tech },
   { label: "Server name", type: "text", group: G.tech, shown: ["Dedicated server", ["Yes"]] },
-  { label: "Server cost to client (USD)", type: "money", group: G.tech, shown: ["Dedicated server", ["Yes"]] },
-  { label: "Technical review performed", type: "yesno", group: G.tech },
+  { label: "Server cost to client (USD)", type: "money", group: G.tech, shown: ["Dedicated server", ["Yes"]], fees: true },
+  { label: "Technical review performed", type: "yesno", group: G.tech, signedOffBy: TECH_REVIEWERS },
   { label: "Regulated market", type: "yesno", group: G.terms },
   { label: "Market we will operate in", type: "multiselect", options: COUNTRIES, group: G.terms },
   {
@@ -109,11 +114,11 @@ export const KIRON_FIELDS: FieldDef[] = [
   { label: "Custom termination period (days)", type: "number", group: G.terms, shown: ["Termination period", ["Custom Period"]] },
   { label: "Term of agreement", type: "select", options: ["Standard Term (2 years)", "Custom Term"], group: G.terms },
   { label: "Custom term (years)", type: "number", group: G.terms, shown: ["Term of agreement", ["Custom Term"]] },
-  { label: "Fee/rate type", type: "select", options: ["Flat Rate", "Flat Fee", "Variable Rate", "Multiple Rates"], group: G.fees },
-  { label: "Flat rate %", type: "number", group: G.fees, shown: ["Fee/rate type", ["Flat Rate"]] },
-  { label: "Flat fee amount (USD)", type: "money", group: G.fees, shown: ["Fee/rate type", ["Flat Fee"]] },
-  { label: "Based on GGR/NGR", type: "select", options: ["GGR", "NGR"], group: G.fees, shown: ["Fee/rate type", ["Flat Rate", "Variable Rate", "Multiple Rates"]] },
-  { label: "Multiple rates information", type: "textarea", group: G.fees, shown: ["Fee/rate type", ["Multiple Rates"]] },
+  { label: "Fee/rate type", type: "select", options: ["Flat Rate", "Flat Fee", "Variable Rate", "Multiple Rates"], group: G.fees, fees: true },
+  { label: "Flat rate %", type: "number", group: G.fees, shown: ["Fee/rate type", ["Flat Rate"]], fees: true },
+  { label: "Flat fee amount (USD)", type: "money", group: G.fees, shown: ["Fee/rate type", ["Flat Fee"]], fees: true },
+  { label: "Based on GGR/NGR", type: "select", options: ["GGR", "NGR"], group: G.fees, shown: ["Fee/rate type", ["Flat Rate", "Variable Rate", "Multiple Rates"]], fees: true },
+  { label: "Multiple rates information", type: "textarea", group: G.fees, shown: ["Fee/rate type", ["Multiple Rates"]], fees: true },
   ...tierFields,
   // 04 Feasibility (RICE), custom integrations only
   { label: "RICE analysis needed", type: "yesno", group: G.rice, shown: CUSTOM_ONLY },
@@ -284,6 +289,8 @@ export async function applyKironPipeline(actor: Actor) {
       extraEditorRoles: d.legalCanEdit ? ["legal"] : [],
       showWhen: d.shown ? { field: f(d.shown[0]), values: d.shown[1] } : null,
       derive: d.fromAmount ? { from: "amountMonthly", ranges: d.fromAmount.map(([value, min]) => ({ value, min })) } : null,
+      commercial: d.fees ?? false,
+      editTeamId: d.signedOffBy ? await ensureGroup(d.signedOffBy) : null,
     });
   }
   for (const [stageKey, rules] of Object.entries(KIRON_RULES)) {

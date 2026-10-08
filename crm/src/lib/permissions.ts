@@ -1,7 +1,19 @@
 import type { ObjectType, Role } from "@/db/schema";
 import type { FieldSpec } from "./fields";
 
-export type Actor = { id: string; role: Role; name: string };
+// teamIds: the departments and groups the person is in. teamSeesCommercials: one of them may see
+// fees and rates (e.g. Finance).
+export type Actor = { id: string; role: Role; name: string; teamIds?: string[]; teamSeesCommercials?: boolean };
+
+// Fees and rates (fields marked "commercial"): Sales, AMs, Legal, managers and admins see them;
+// everyone else only through a team that's allowed to (Q63).
+export function canSeeCommercials(actor: Actor) {
+  return actor.role !== "viewer" || !!actor.teamSeesCommercials;
+}
+
+export function canSeeField(actor: Actor, spec: { commercial?: boolean }) {
+  return !spec.commercial || canSeeCommercials(actor);
+}
 
 // Everyone signed in can see everything. Editing:
 // - admin and manager: everything
@@ -21,6 +33,9 @@ export function canEditRecord(actor: Actor, record: { ownerId: string | null }, 
 
 export function canEditField(actor: Actor, objectType: ObjectType, record: { ownerId: string | null }, spec: FieldSpec, opts: { collaboratorIds?: string[] } = {}) {
   if (spec.derive) return false; // filled in by KRM, never typed
+  if (!canSeeField(actor, spec)) return false;
+  // A sign-off: only the team it belongs to (admins can step in).
+  if (spec.editTeam) return actor.role === "admin" || (actor.teamIds ?? []).includes(spec.editTeam);
   if (canEditRecord(actor, record, opts)) {
     // Only the owner, a manager or an admin can hand a record to someone else.
     if (spec.key === "ownerId") return isManager(actor) || record.ownerId === actor.id;

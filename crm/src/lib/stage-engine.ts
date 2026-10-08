@@ -131,10 +131,10 @@ export async function loadPipelineConfig(q: Q): Promise<PipelineConfig> {
       select id, from_stage as "fromStage", to_stage as "toStage", when_field as "whenField", when_value as "whenValue", position
       from stage_transitions order by from_stage, position, created_at`),
     q.execute(sql`
-      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, archived
+      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, edit_team_id as "editTeam", commercial, archived
       from property_definitions where object_type = 'deal'`),
     q.execute(sql`
-      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, archived
+      select key, label, type, options, group_label as "groupLabel", extra_editor_roles as "extraEditorRoles", show_when as "showWhen", derive, edit_team_id as "editTeam", commercial, archived
       from property_definitions where object_type = 'company'`),
   ]);
   return {
@@ -268,6 +268,70 @@ async function moveAutomatically(tx: Tx, row: Record<string, unknown>, to: Stage
     message: `"${row.name}" moved to ${to.label}: ${reason}`,
   });
   if (to.kind === "won") await handOverToAccountManager(tx, id);
+  await askForSignOffs(tx, id);
+}
+
+// ---------- sign-offs ----------
+
+// The stage's sign-offs that are still open: requirements on a field only a department or group
+// fills in (e.g. Technical review performed, by the technical reviewers).
+export function openSignOffs(deal: DealSnapshot, cfg: PipelineConfig) {
+  const ev = evaluate(deal, cfg);
+  const open = new Set(ev.requirements.filter((r) => !r.met).map((r) => r.id));
+  return cfg.requirements
+    .filter((r) => open.has(r.id) && r.kind === "field")
+    .map((r) => ({ requirement: r, field: cfg.fields.find((f) => f.key === r.fieldKey)! }))
+    .filter((x) => x.field?.editTeam)
+    .map((x) => ({ fieldKey: x.field.key, label: x.field.label, teamId: x.field.editTeam! }));
+}
+
+/**
+ * Tells the people who sign off that a deal is waiting for them, once per stage it enters.
+ * Everyone in the group hears, so a backup can step in when someone is away.
+ */
+export async function askForSignOffs(tx: Tx, dealId: string) {
+  const cfg = await loadPipelineConfig(tx);
+  if (!cfg.fields.some((f) => f.editTeam)) return;
+  const row = (await tx.execute(sql`select * from deals where id = ${dealId} and deleted_at is null`)).rows[0];
+  if (!row) return;
+  const stage = cfg.stages.find((s) => s.key === row.stage_key);
+  for (const s of openSignOffs(await snapshotDeal(tx, row, cfg), cfg)) {
+    const people = await tx.execute(sql`
+      select u.id from team_members m join users u on u.id = m.user_id
+      where m.team_id = ${s.teamId} and u.active
+        and not exists (
+          select 1 from notifications n where n.user_id = u.id and n.deal_id = ${dealId} and n.kind = 'signoff_needed'
+            and n.stage_key = ${row.stage_key as string} and n.created_at >= ${row.stage_entered_at as Date})`);
+    await notify(tx, people.rows.map((p) => p.id as string), {
+      kind: "signoff_needed",
+      dealId,
+      stageKey: row.stage_key as string,
+      message: `"${row.name}" needs your sign-off: ${s.label} (${stage?.label ?? row.stage_key}).`,
+    });
+  }
+}
+
+export type WaitingSignOff = { dealId: string; dealName: string; stageLabel: string; label: string; since: string };
+
+// "Waiting for you": deals sitting at a stage where one of the person's groups still has to sign off.
+export async function signOffsWaiting(teamIds: string[]): Promise<WaitingSignOff[]> {
+  if (!teamIds.length) return [];
+  const cfg = await loadPipelineConfig(db);
+  const mine = new Set(cfg.fields.filter((f) => f.editTeam && teamIds.includes(f.editTeam)).map((f) => f.key));
+  const stages = [...new Set(cfg.requirements.filter((r) => r.kind === "field" && r.fieldKey && mine.has(r.fieldKey)).map((r) => r.stageKey))];
+  if (!stages.length) return [];
+  const deals = await db.execute(sql`
+    select * from deals where deleted_at is null and stage_key in (${sql.join(stages.map((k) => sql`${k}`), sql`, `)})
+    order by stage_entered_at`);
+  const out: WaitingSignOff[] = [];
+  for (const row of deals.rows) {
+    const stage = cfg.stages.find((s) => s.key === row.stage_key);
+    for (const s of openSignOffs(await snapshotDeal(db, row, cfg), cfg)) {
+      if (!mine.has(s.fieldKey)) continue;
+      out.push({ dealId: row.id as string, dealName: row.name as string, stageLabel: stage?.label ?? (row.stage_key as string), label: s.label, since: String(row.stage_entered_at) });
+    }
+  }
+  return out;
 }
 
 /**

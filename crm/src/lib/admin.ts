@@ -8,11 +8,13 @@ import { canManageUsersAndFields, type Actor } from "./permissions";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function cleanUser(name: string, email: string) {
+// The email can be left empty for people added by an admin: they're matched to their Microsoft
+// account when they first sign in.
+function cleanUser(name: string, email: string | null | undefined, { emailRequired = true } = {}) {
   const n = name.trim();
-  const e = email.trim().toLowerCase();
+  const e = (email ?? "").trim().toLowerCase() || null;
   if (!n) throw new RuleError("Enter a name.");
-  if (!EMAIL_RE.test(e)) throw new RuleError("Enter a valid work email address.");
+  if (e ? !EMAIL_RE.test(e) : emailRequired) throw new RuleError("Enter a valid work email address.");
   return { n, e };
 }
 
@@ -29,12 +31,14 @@ export async function createFirstAdmin(name: string, email: string): Promise<str
   });
 }
 
-export async function createUser(actor: Actor, input: { name: string; email: string; role: Role }) {
+export async function createUser(actor: Actor, input: { name: string; email?: string | null; role: Role; title?: string | null; reportsTo?: string | null }) {
   if (!canManageUsersAndFields(actor)) throw new PermissionError("Only an admin can add people.");
-  const { n, e } = cleanUser(input.name, input.email);
+  const { n, e } = cleanUser(input.name, input.email, { emailRequired: false });
   if (!ROLES.includes(input.role)) throw new RuleError("Pick a role.");
   try {
-    const res = await db.execute(sql`insert into users (name, email, role) values (${n}, ${e}, ${input.role}) returning id`);
+    const res = await db.execute(sql`
+      insert into users (name, email, role, title, reports_to)
+      values (${n}, ${e}, ${input.role}, ${input.title?.trim() || null}, ${input.reportsTo?.trim() || null}) returning id`);
     return res.rows[0].id as string;
   } catch (err) {
     translateDbError(err);
@@ -72,6 +76,8 @@ export type FieldDefinitionInput = {
   extraEditorRoles?: string[];
   showWhen?: ShowWhen | null;
   derive?: Derive | null;
+  editTeamId?: string | null;
+  commercial?: boolean;
 };
 
 // "Filled in by itself from <number field>": the source must be a number or money field and
@@ -101,6 +107,14 @@ async function cleanShowWhen(objectType: ObjectType, ownKey: string, showWhen: S
   return { field: other.key, values };
 }
 
+// "Only these people fill it in": a department or group.
+async function cleanTeam(teamId: string | null | undefined): Promise<string | null> {
+  if (!teamId) return null;
+  const res = await db.execute(sql`select id from teams where id = ${teamId}`);
+  if (!res.rows[0]) throw new RuleError("Pick a department or group that exists.");
+  return teamId;
+}
+
 function cleanOptions(type: FieldType, options: string[] | undefined) {
   const opts = [...new Set((options ?? []).map((o) => o.trim()).filter(Boolean))];
   if ((type === "select" || type === "multiselect") && opts.length < 1) throw new RuleError("Add at least one option for a dropdown field.");
@@ -118,13 +132,14 @@ export async function createFieldDefinition(actor: Actor, input: FieldDefinition
   const roles = (input.extraEditorRoles ?? []).filter((r) => (ROLES as readonly string[]).includes(r));
   const showWhen = await cleanShowWhen(input.objectType, key, input.showWhen);
   const derive = await cleanDerive(input.objectType, input.type, options, input.derive);
+  const editTeamId = await cleanTeam(input.editTeamId);
   try {
     const pos = await db.execute(sql`select coalesce(max(position), 0) + 1 as p from property_definitions where object_type = ${input.objectType}`);
     const res = await db.execute(sql`
-      insert into property_definitions (object_type, key, label, type, options, group_label, position, extra_editor_roles, show_when, derive)
+      insert into property_definitions (object_type, key, label, type, options, group_label, position, extra_editor_roles, show_when, derive, edit_team_id, commercial)
       values (${input.objectType}, ${key}, ${label}, ${input.type}, ${JSON.stringify(options)}::jsonb, ${input.groupLabel?.trim() || null},
               ${pos.rows[0].p as number}, ${JSON.stringify(roles)}::jsonb, ${showWhen ? JSON.stringify(showWhen) : null}::jsonb,
-              ${derive ? JSON.stringify(derive) : null}::jsonb)
+              ${derive ? JSON.stringify(derive) : null}::jsonb, ${editTeamId}, ${!!input.commercial})
       returning id`);
     return res.rows[0].id as string;
   } catch (err) {
@@ -136,7 +151,10 @@ export async function createFieldDefinition(actor: Actor, input: FieldDefinition
 export async function updateFieldDefinition(
   actor: Actor,
   id: string,
-  input: { label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: ShowWhen | null; archived?: boolean },
+  input: {
+    label?: string; options?: string[]; groupLabel?: string | null; extraEditorRoles?: string[]; showWhen?: ShowWhen | null;
+    editTeamId?: string | null; commercial?: boolean; archived?: boolean;
+  },
 ) {
   if (!canManageUsersAndFields(actor)) throw new PermissionError("Only an admin can change fields.");
   const cur = await db.execute(sql`select type, object_type, key from property_definitions where id = ${id}`);
@@ -147,6 +165,7 @@ export async function updateFieldDefinition(
   if (input.label !== undefined && !label) throw new RuleError("Give the field a name.");
   const options = input.options !== undefined ? cleanOptions(type, input.options) : undefined;
   const roles = input.extraEditorRoles?.filter((r) => (ROLES as readonly string[]).includes(r));
+  const editTeamId = input.editTeamId !== undefined ? await cleanTeam(input.editTeamId) : undefined;
   await db.execute(sql`
     update property_definitions set
       label = coalesce(${label ?? null}, label),
@@ -154,6 +173,8 @@ export async function updateFieldDefinition(
       group_label = ${input.groupLabel !== undefined ? sql`${input.groupLabel?.trim() || null}` : sql`group_label`},
       extra_editor_roles = coalesce(${roles ? JSON.stringify(roles) : null}::jsonb, extra_editor_roles),
       show_when = ${showWhen !== undefined ? sql`${showWhen ? JSON.stringify(showWhen) : null}::jsonb` : sql`show_when`},
+      edit_team_id = ${editTeamId !== undefined ? sql`${editTeamId}` : sql`edit_team_id`},
+      commercial = coalesce(${input.commercial ?? null}, commercial),
       archived = coalesce(${input.archived ?? null}, archived),
       updated_at = now()
     where id = ${id}`);
