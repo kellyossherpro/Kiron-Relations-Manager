@@ -7,9 +7,12 @@ import { LinkAdder, UnlinkButton } from "@/components/link-adder";
 import { RecordFields } from "@/components/record-fields";
 import { NotFoundError } from "@/lib/errors";
 import { money } from "@/lib/format";
-import { canDelete, canEditRecord, canLogActivity, isManager } from "@/lib/permissions";
+import { canUploadFiles, canDelete, canEditRecord, canLogActivity, isManager } from "@/lib/permissions";
 import { companyOptions, contactOptions, getCompanyRelations, getRecord, listActivities, listHistory, listStages, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
+import { listFiles } from "@/lib/files";
+import { teamOptions } from "@/lib/teams";
+import { FilesPanel } from "@/components/files-panel";
 import { clientFields, visibleHistory, visibleRecord } from "@/lib/view";
 
 export default async function CompanyPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,8 +26,8 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
     throw e;
   }
   const { row, specs, values, hidden } = visibleRecord(actor, record);
-  const [rel, users, companies, contacts, activities, history, stages] = await Promise.all([
-    getCompanyRelations(id), listUsers(), companyOptions(), contactOptions(), listActivities({ companyId: id }), listHistory("company", id), listStages(),
+  const [rel, users, companies, contacts, activities, history, stages, files, teams] = await Promise.all([
+    getCompanyRelations(id), listUsers(), companyOptions(), contactOptions(), listActivities({ companyId: id }), listHistory("company", id), listStages(), listFiles(actor, "company", id), teamOptions(),
   ]);
   const userOptions = users.map((u) => ({ id: u.id, label: u.name }));
   const canEdit = canEditRecord(actor, { ownerId: row.owner_id });
@@ -48,6 +51,8 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
         <div className="min-w-0 space-y-5">
           <RecordFields objectType="company" recordId={id} fields={clientFields(actor, "company", row.owner_id, specs)} values={values}
             lookups={{ companies: companies.filter((c) => c.id !== id), users: userOptions }} />
+          <FilesPanel objectType="company" objectId={id} files={files.files} hidden={files.hidden} teams={teams}
+            canUpload={canUploadFiles(actor, { ownerId: row.owner_id })} />
           <ActivityPanel parent={{ companyId: id }} items={activities} users={userOptions} me={{ id: actor.id, isAdmin: isManager(actor) }} canLog={canLogActivity(actor)} />
         </div>
         <div className="min-w-0 space-y-5">

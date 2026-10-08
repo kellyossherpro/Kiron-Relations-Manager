@@ -14,9 +14,12 @@ import { DEAL_CONTACT_ROLES } from "@/db/schema";
 import { NotFoundError } from "@/lib/errors";
 import { DEAL_CONTACT_ROLE_LABEL, plural } from "@/lib/format";
 import { dealAddendums } from "@/lib/addendums";
-import { canConfirmGoLive, canDelete, canEditRecord, canFinishAddendum, canLogActivity, canMoveStage, canRaiseAddendum, isManager } from "@/lib/permissions";
+import { canUploadFiles, canConfirmGoLive, canDelete, canEditRecord, canFinishAddendum, canLogActivity, canMoveStage, canRaiseAddendum, isManager } from "@/lib/permissions";
 import { companyOptions, contactOptions, dealDaysInStage, getDealLinks, getRecord, listActivities, listHistory, listStages, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
+import { listFiles } from "@/lib/files";
+import { teamOptions } from "@/lib/teams";
+import { FilesPanel } from "@/components/files-panel";
 import { isShown } from "@/lib/conditions";
 import { dealButtons } from "@/lib/settings";
 import { evaluateDeal } from "@/lib/stage-engine";
@@ -33,7 +36,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     throw e;
   }
   const { row, specs, values, hidden } = visibleRecord(actor, record);
-  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation, addendums, buttons] = await Promise.all([
+  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation, addendums, buttons, files, teams] = await Promise.all([
     getDealLinks(id),
     listStages(),
     listUsers(),
@@ -45,6 +48,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     evaluateDeal(id),
     dealAddendums(id),
     dealButtons(),
+    listFiles(actor, "deal", id),
+    teamOptions(),
   ]);
   const goLive = (await goLiveChecks(db, [{ id, properties: row.properties as Record<string, unknown> }])).get(id) ?? [];
   const shownButtons = buttons.filter((b) => isShown({ key: "", showWhen: b.showWhen }, values));
@@ -113,6 +118,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             />
           )}
           <RecordFields objectType="deal" recordId={id} fields={clientFields(actor, "deal", ownerId, specs, collabIds)} values={values} lookups={lookups} laterGroups={laterGroups} />
+          <FilesPanel objectType="deal" objectId={id} files={files.files} hidden={files.hidden} teams={teams}
+            canUpload={canUploadFiles(actor, { ownerId }, { collaboratorIds: collabIds })} />
           <ActivityPanel parent={{ dealId: id }} items={activities} users={userOptions} me={{ id: actor.id, isAdmin: isManager(actor) }} canLog={canLogActivity(actor)} />
         </div>
 

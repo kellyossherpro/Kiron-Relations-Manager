@@ -178,3 +178,9 @@ export async function applyKironOrg(actor: Actor): Promise<OrgSetupResult> {
     return result;
   });
 }
+
+// Departments and groups for pickers (groups first).
+export async function teamOptions(): Promise<{ id: string; name: string }[]> {
+  const res = await db.execute(sql`select id, name from teams order by kind desc, lower(name)`);
+  return res.rows as { id: string; name: string }[];
+}

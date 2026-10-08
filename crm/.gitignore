@@ -43,3 +43,6 @@ next-env.d.ts
 !.env.example
 
 /e2e/screenshots
+
+# uploaded files when FILE_STORAGE=local (dev only)
+/.krm-files/

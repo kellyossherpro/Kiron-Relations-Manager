@@ -11,6 +11,8 @@ import { createRecord, updateRecord, withTx } from "@/lib/records";
 import { askForGoLive, askForSignOffs, runDailyRules } from "@/lib/stage-engine";
 import { addTeamMember, createTeam, TECH_REVIEWERS, updateTeam } from "@/lib/teams";
 import { confirmGoLive } from "@/lib/go-live";
+import { finishUpload, openFile, receiveUpload, startUpload, type FileAccess, type FileCategory } from "@/lib/files";
+import { fileStore } from "@/lib/storage";
 
 // Fills an EMPTY database with a made-up company's CRM, for demos and the tour:
 //   npm run example:load    (refuses if there is any data)
@@ -27,11 +29,52 @@ async function isEmpty() {
   return Number(r.rows[0].n) === 0;
 }
 
+// A small, valid one-page PDF with a few lines of text, for the example files.
+function examplePdf(lines: string[]): Uint8Array {
+  const text = lines.map((l, i) => `BT /F1 ${i === 0 ? 18 : 11} Tf 60 ${760 - i * 22} Td (${l.replace(/[^\x20-\x7e]|[()\\]/g, "")}) Tj ET`).join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    `<< /Length ${text.length} >>\nstream\n${text}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objects.forEach((o, i) => {
+    offsets.push(pdf.length);
+    pdf += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new TextEncoder().encode(pdf);
+}
+
+async function exampleFile(actor: Actor, dealId: string, name: string, category: FileCategory, lines: string[], access?: FileAccess, teamIds?: string[]) {
+  const bytes = examplePdf(lines);
+  const store = fileStore();
+  const { fileId } = await startUpload(actor, { objectType: "deal", objectId: dealId, name, size: bytes.byteLength, category, access, teamIds }, store);
+  await receiveUpload(actor, fileId, bytes, store);
+  await finishUpload(actor, fileId, store);
+  return fileId;
+}
+
 export async function clearExampleData() {
   // People loaded from the organogram have no email, so they count as real too.
   const real = await db.execute(sql`select count(*)::int as n from users where email is null or email not like '%@example.test'`);
   if ((real.rows[0].n as number) > 0) throw new Error("This database has people who aren't example users. Not clearing it.");
-  await db.execute(sql`truncate addendums, notifications, team_members, teams, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
+  // The example files' bytes too (skipped if file storage isn't set up).
+  const stored = await db.execute(sql`select storage_key from files`);
+  if (stored.rows.length) {
+    try {
+      const store = fileStore();
+      for (const r of stored.rows) await store.remove(r.storage_key as string);
+    } catch {
+      // nothing stored anywhere
+    }
+  }
+  await db.execute(sql`truncate addendums, notifications, file_downloads, files, team_members, teams, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
   await db.execute(sql`delete from stage_requirements; delete from app_settings`);
   await db.execute(sql`delete from stage_transitions`);
   await db.execute(sql`
@@ -83,7 +126,10 @@ export async function loadExampleData() {
       await addTeamMember(admin, id, m.id);
       m.teamIds = [...(m.teamIds ?? []), id];
     }
-    if (name === "Finance") await updateTeam(admin, id, { seesCommercials: true });
+    if (name === "Finance") {
+      await updateTeam(admin, id, { seesCommercials: true });
+      fran.teamSeesCommercials = true;
+    }
   }
   const reviewers = (await db.execute(sql`select id from teams where name = ${TECH_REVIEWERS}`)).rows[0].id as string;
   await addTeamMember(admin, reviewers, rae.id);
@@ -204,6 +250,19 @@ export async function loadExampleData() {
   await withTx((tx) => askForGoLive(tx, kestrelWon));
   await confirmGoLive(lee, kestrelWon, "legal");
   await confirmGoLive(fran, kestrelWon, "finance", "Billing set up from the live date");
+
+  // Files: a proposal (fees and rates, so not for everyone), a RICE report, and a contract only Legal opens.
+  const proposal = await exampleFile(jo, riverstone, "Riverstone proposal v2.pdf", "proposal", [
+    "Proposal: Riverstone - Shop Estate Rollout", "Example only. Every name and figure is made up.", "", "Setup fee: USD 2,500", "Monthly minimum: USD 1,500", "Flat rate: 10% of GGR",
+  ]);
+  await openFile(fran, proposal);
+  await exampleFile(sam, summit, "Summit RICE report.pdf", "rice_report", [
+    "RICE evaluation: Summit - Custom Racing Feed", "Example only.", "", "Reach 6, Impact 7, Confidence 60%, Effort 4", "Score: 6.3",
+  ]);
+  const legalTeam = lee.teamIds ?? [];
+  await exampleFile(lee, live1, "Northgate agreement (signed).pdf", "contract", [
+    "Services agreement: Northgate - Live Casino", "Example only.", "", "Signed by both parties.",
+  ], "teams", legalTeam);
 
   return { deals: 15 };
 }

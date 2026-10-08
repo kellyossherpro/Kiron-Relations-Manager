@@ -84,3 +84,23 @@ export function canFinishAddendum(actor: Actor, record: { ownerId: string | null
 export function canConfirmGoLive(actor: Actor, teamIds: string[]) {
   return actor.role === "admin" || teamIds.some((t) => (actor.teamIds ?? []).includes(t));
 }
+
+// Files on deals and companies. Uploading: anyone who can edit the record, plus Legal (contracts) and
+// account managers on any record; read-only people can't. Opening: as the file's access says, and
+// always the person who uploaded it and admins.
+export function canUploadFiles(actor: Actor, record: { ownerId: string | null }, opts: { collaboratorIds?: string[] } = {}) {
+  return ["admin", "manager", "legal", "account_manager"].includes(actor.role) || canEditRecord(actor, record, opts);
+}
+
+export type FileAccessInfo = { access: "everyone" | "commercial" | "teams"; teamIds: string[]; uploadedBy: string };
+
+export function canOpenFile(actor: Actor, file: FileAccessInfo) {
+  if (actor.role === "admin" || file.uploadedBy === actor.id) return true;
+  if (file.access === "everyone") return true;
+  if (file.access === "commercial") return canSeeCommercials(actor);
+  return file.teamIds.some((t) => (actor.teamIds ?? []).includes(t));
+}
+
+export function canDeleteFile(actor: Actor, file: { uploadedBy: string }) {
+  return actor.role === "admin" || file.uploadedBy === actor.id;
+}

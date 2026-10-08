@@ -387,3 +387,43 @@ export const goLiveConfirmations = pgTable(
   },
   (t) => [uniqueIndex("go_live_one_per_check").on(t.dealId, t.checkKey)],
 );
+
+// Files on deals and companies (proposals, RICE reports, contracts…). The bytes live in private
+// storage (src/lib/storage.ts) under `storage_key`; this row says who may open them.
+// `access`: everyone who can see the record, only people who see fees and rates, or only `team_ids`.
+// An upload starts "pending" and becomes "ready" once the bytes have arrived.
+export const FILE_CATEGORIES = ["proposal", "rice_report", "contract", "other"] as const;
+export const FILE_ACCESS = ["everyone", "commercial", "teams"] as const;
+export const files = pgTable(
+  "files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    objectType: text("object_type").$type<"deal" | "company">().notNull(),
+    objectId: uuid("object_id").notNull(),
+    category: text("category").$type<(typeof FILE_CATEGORIES)[number]>().notNull(),
+    name: text("name").notNull(), // the file name as uploaded
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    storageKey: text("storage_key").notNull(),
+    access: text("access").$type<(typeof FILE_ACCESS)[number]>().notNull().default("everyone"),
+    teamIds: jsonb("team_ids").$type<string[]>().notNull().default([]),
+    status: text("status").$type<"pending" | "ready">().notNull().default("pending"),
+    uploadedBy: uuid("uploaded_by").notNull().references(() => users.id),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: uuid("deleted_by").references(() => users.id),
+  },
+  (t) => [uniqueIndex("files_storage_key_unique").on(t.storageKey), index("files_object_idx").on(t.objectType, t.objectId)],
+);
+
+// Every time someone opens or downloads a file.
+export const fileDownloads = pgTable(
+  "file_downloads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fileId: uuid("file_id").notNull().references(() => files.id),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("file_downloads_file_idx").on(t.fileId, t.at)],
+);

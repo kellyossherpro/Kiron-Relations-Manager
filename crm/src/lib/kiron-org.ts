@@ -1,7 +1,7 @@
 // Kiron's departments and people, from the organogram Kelly shared on 2026-10-08. Names, job titles
 // and who each person reports to only: never email addresses or phone numbers (CLAUDE.md).
 // People are matched to their Microsoft account when they first sign in.
-// Complete as of 2026-10-08: 20 departments, 117 people. One surname still to confirm (Kefentse).
+// Complete as of 2026-10-08: 20 departments, 117 people (Kelly confirmed there are no more departments).
 
 export type OrgPerson = { name: string; title: string; reportsTo?: string };
 export type OrgDepartment = { name: string; people: OrgPerson[] };
@@ -35,7 +35,7 @@ export const KIRON_ORG: OrgDepartment[] = [
       { name: "Daniel van den Heever", title: "Support and Installations Technician", reportsTo: "Nkosana Phiri" },
       { name: "Darren Kessel", title: "Head of IT Services", reportsTo: "Justin Frost" },
       { name: "Hernan Montoya", title: "Technical Product Trainer", reportsTo: "Nkosana Phiri" },
-      { name: "Kefentse Ignatius Tlab…", title: "Junior Network Administrator", reportsTo: "Thabiso Mfumadi" }, // surname cut off: ask Kelly
+      { name: "Kefentse Ignatius Tlabakwe", title: "Junior Network Administrator", reportsTo: "Thabiso Mfumadi" },
       { name: "Luyanda Thenjwayo", title: "Support and Installations Technician", reportsTo: "Tebatso Letsoalo" },
       { name: "Marlon Roux", title: "Customer Service Agent", reportsTo: "Nkosana Phiri" },
       { name: "Mxolisi Vilakazi", title: "Support and Installations Technician", reportsTo: "Nkosana Phiri" },

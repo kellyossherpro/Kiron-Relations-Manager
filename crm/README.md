@@ -49,6 +49,7 @@ src/lib/settings.ts     company-wide settings (buttons on deals)
 src/lib/teams.ts        departments and groups; "Set up Kiron's people" (from kiron-org.ts)
 src/lib/kiron-org.ts    Kiron's departments, people, job titles (organogram; never emails or phones)
 src/lib/view.ts         what a page may show this person (fields, values, history)
+src/lib/files.ts        files on deals and companies: add, who can open, download log (bytes: storage.ts)
 src/lib/go-live.ts      go-live handovers: confirm/undo, who confirms, Live board data (rules in go-live-checks.ts)
 src/lib/links.ts        contacts↔companies, deal contacts with roles, collaborators
 src/lib/activities.ts   notes, calls, meetings, tasks
@@ -96,6 +97,14 @@ Rules that matter:
   it moves to Live by itself. When everything else for the stage is in, each department is notified once and
   the deal shows on their My tasks. Confirmations can be undone until the deal goes Live. `/live` is the
   Live board: going-live deals with each handover's status, and every live client; it refreshes every 30 s.
+- **Files** (`files`, `file_downloads`): on deals and companies; Proposal, RICE report, Contract or Other; PDF,
+  Office files, images, up to 50 MB. Each file is open to everyone, to people who see fees and rates (the
+  default for proposals and contracts), or to chosen departments; the uploader and admins always can. Files
+  someone can't open aren't listed (only a count), and the deal history says "Added a file: Proposal"
+  without the name. Every open goes through `/files/<id>`, which checks and logs it (the uploader and admins
+  see who opened it). The browser uploads in two steps (start → send the bytes → finish) so big files go
+  straight to storage. Removing hides the file and keeps the bytes. `FILE_STORAGE=local` keeps files in
+  `.krm-files/` (development); production refuses to store files until `FILE_STORAGE` is set.
 - **Fees and rates** (`commercial` fields) are left out of the page, the values and the history for viewers,
   unless one of their departments "can see fees and rates" (Finance). Other roles always see them.
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.
@@ -114,6 +123,14 @@ Project settings: Root Directory `crm`. Environment variables:
 | `SITE_PASSWORD` | the password testers type first |
 | `CRON_SECRET` | any long random string (Vercel sends it to `/api/cron/daily`, scheduled in `vercel.json`) |
 | `EXAMPLE_DATA` | `1` to load the example company into an empty database |
+| `FILE_STORAGE` | `supabase` |
+| `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` key (secret: only ever in Vercel's settings) |
+
+Files also need a bucket: Supabase → Storage → **New bucket**, name `krm-files`, **Public: off**. KRM never makes
+files public: each download is checked and logged, then served through a link that works for one minute.
+The Supabase upload/download calls are covered by tests with a stand-in, not yet against a real project:
+check adding and opening a file once the test version is up.
 
 Before any real data: Microsoft sign-in instead of `AUTH_MODE=dev`, remove `SITE_PASSWORD`, and verify
 Supabase's certificate in `src/db/config.ts`.

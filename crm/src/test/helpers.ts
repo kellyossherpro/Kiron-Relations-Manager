@@ -6,7 +6,7 @@ import type { Actor } from "@/lib/permissions";
 // Empties every table and puts the stage settings back to how KRM ships: the stage list,
 // the straight-line routes, no requirements and no settings.
 export async function resetDb() {
-  await db.execute(sql`truncate addendums, notifications, team_members, teams, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
+  await db.execute(sql`truncate addendums, notifications, file_downloads, files, team_members, teams, audit_log, activities, deal_collaborators, deal_contacts, deal_companies, company_contacts, deals, contacts, companies, property_definitions, users restart identity cascade`);
   await db.execute(sql`delete from stage_requirements; delete from app_settings; delete from stage_transitions`);
   await db.execute(sql`
     insert into stage_transitions (from_stage, to_stage, position) values

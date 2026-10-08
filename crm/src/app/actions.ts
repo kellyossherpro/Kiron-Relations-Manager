@@ -23,6 +23,8 @@ import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord,
 import { requireActor, signInAs, signOut } from "@/lib/session";
 import { GATE_COOKIE, gateToken, passwordMatches, safeNext } from "@/lib/site-gate";
 import { applyKironPipeline } from "@/lib/kiron-pipeline";
+import { deleteFile, finishUpload, startUpload, type StartUpload } from "@/lib/files";
+import type { UploadTarget } from "@/lib/storage";
 import { confirmGoLive, setGoLiveTeams, undoGoLive, type GoLiveTeams } from "@/lib/go-live";
 import type { CheckKey } from "@/lib/go-live-checks";
 import { addTeamMember, applyKironOrg, createTeam, deleteTeam, removeTeamMember, updateTeam, type TeamKind } from "@/lib/teams";
@@ -283,6 +285,33 @@ export async function updateFieldAction(
 ): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => updateFieldDefinition(actor, id, input));
+  refresh();
+  return res;
+}
+
+// ---------- files ----------
+
+export async function startUploadAction(input: StartUpload): Promise<ActionResult & { target?: UploadTarget }> {
+  const actor = await requireActor();
+  let target: UploadTarget | undefined;
+  const res = await attempt(async () => {
+    const started = await startUpload(actor, input);
+    target = started.target;
+    return started.fileId;
+  });
+  return { ...res, target };
+}
+
+export async function finishUploadAction(fileId: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => finishUpload(actor, fileId));
+  refresh();
+  return res;
+}
+
+export async function deleteFileAction(fileId: string): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => deleteFile(actor, fileId));
   refresh();
   return res;
 }

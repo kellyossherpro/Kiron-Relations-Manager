@@ -2,6 +2,8 @@ import { dateTime, money } from "@/lib/format";
 
 const GO_LIVE_LABEL: Record<string, string> = { legal: "Legal", finance: "Finance", support: "Support", dev: "Dev" };
 
+const FILE_LABEL: Record<string, string> = { proposal: "Proposal", rice_report: "RICE report", contract: "Contract", other: "Other" };
+
 type Entry = { id: number; action: string; field: string | null; oldValue: unknown; newValue: unknown; at: string; userName: string | null };
 
 function show(v: unknown, names: Record<string, string> = {}) {
@@ -40,6 +42,10 @@ export function HistoryList({ entries, labels, stageLabels, names = {}, moneyFie
           ) : (
             <>Undid the <strong>{which}</strong> go-live handover</>
           );
+        } else if (e.action === "file") {
+          // The file's name isn't shown: not everyone who reads the history may open the file.
+          const nv = e.newValue as { category: string; added: boolean };
+          text = <>{nv.added ? "Added" : "Removed"} a file: <strong>{FILE_LABEL[nv.category] ?? "Other"}</strong></>;
         } else if (e.action === "link" || e.action === "unlink") text = e.action === "link" ? "Added a link" : "Removed a link";
         else
           text = (
