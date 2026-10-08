@@ -16,7 +16,8 @@ and keep everything "idiot-proof, as simple as possible" (her design principle).
 
 ## Hard rules
 
-- **No real Kiron data in the repo or the dev database** — no clients, contacts, deals or staff names.
+- **No real client data in the repo or the dev database** — no clients, contacts or deals. Staff names and
+  departments are allowed (Kelly, 2026-10-08), but never staff email addresses or phone numbers.
   Tests and walkthroughs use invented `example.test` data only. Leave the dev database blank.
 - Run `npm test`, `npm run typecheck`, `npm run lint` in `crm/` before committing.
 - Schema changes: edit `crm/src/db/schema.ts`, then `npm run db:generate`, never hand-edit old migrations.
