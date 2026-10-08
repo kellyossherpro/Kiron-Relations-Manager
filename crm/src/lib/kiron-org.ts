@@ -1,7 +1,7 @@
 // Kiron's departments and people, from the organogram Kelly shared on 2026-10-08. Names, job titles
 // and who each person reports to only: never email addresses or phone numbers (CLAUDE.md).
 // People are matched to their Microsoft account when they first sign in.
-// Still to come: Sales, Account Management, Finance, Legal, Compliance, Marketing, Product, management.
+// Still to come: Sales, Account Management, Finance, Legal, Compliance, Marketing, management.
 
 export type OrgPerson = { name: string; title: string; reportsTo: string };
 export type OrgDepartment = { name: string; people: OrgPerson[] };
@@ -67,6 +67,58 @@ export const KIRON_ORG: OrgDepartment[] = [
       { name: "Peter Carrington", title: "Junior Animator", reportsTo: "George Christacopoulos" },
       { name: "Ruan Emanuel Rosslee", title: "Artist", reportsTo: "George Christacopoulos" },
       { name: "Stephan Botha", title: "Technical Artist", reportsTo: "George Christacopoulos" },
+    ],
+  },
+  {
+    name: "Development (VSE)",
+    people: [
+      { name: "Bernhard Röhl", title: "Senior Software Developer", reportsTo: "Craig Jennison" },
+      { name: "Craig Jennison", title: "Director of Product and Technology", reportsTo: "Jason Pretorius" },
+      { name: "Dennis Mathabatha", title: "QA Manager", reportsTo: "Craig Jennison" },
+      { name: "Elena Röhl", title: "Senior Frontend Developer", reportsTo: "Craig Jennison" },
+      { name: "Kevin Gregson", title: "Senior Software Developer", reportsTo: "Craig Jennison" },
+      { name: "Liam Martin Skerritt", title: "Intermediate Software Developer", reportsTo: "Kevin Gregson" },
+      { name: "Mary Mokgokolosi Mofokeng", title: "Software Tester", reportsTo: "Dennis Mathabatha" },
+      { name: "Mpho Maimela", title: "Junior Software Tester", reportsTo: "Dennis Mathabatha" },
+      { name: "Nicholas Bosman", title: "Intermediate Software Developer", reportsTo: "Craig Jennison" },
+      { name: "Yannick Thomas", title: "Technical Product Specialist", reportsTo: "Craig Jennison" },
+    ],
+  },
+  {
+    name: "Development - Games",
+    people: [
+      { name: "Brian Nonyane", title: "Senior Backend Developer", reportsTo: "Joaquim Rodrigues" },
+      { name: "Dominic Carvalho", title: "Intermediate Software Developer", reportsTo: "Joaquim Rodrigues" },
+      { name: "Enock Maregere", title: "Senior Backend Developer", reportsTo: "Joaquim Rodrigues" },
+      { name: "Joaquim Rodrigues", title: "Software Development Manager", reportsTo: "Jason Pretorius" },
+      { name: "Kezia Kokosioulis", title: "Intermediate Software Developer", reportsTo: "Joaquim Rodrigues" },
+      { name: "Lionel Raminhos", title: "Senior Software Developer", reportsTo: "Joaquim Rodrigues" },
+      { name: "Navin Maharaj", title: "Senior Software Developer", reportsTo: "Joaquim Rodrigues" },
+      { name: "Ricardo Costa-Tré", title: "Intermediate Software Developer", reportsTo: "Joaquim Rodrigues" },
+    ],
+  },
+  {
+    name: "Design",
+    people: [
+      { name: "Bhavini Parsotam-Parbhoo", title: "Front - End Web Developer", reportsTo: "Martijn Vreugde" },
+      { name: "Martijn Vreugde", title: "Head of Design", reportsTo: "Jason Pretorius" },
+    ],
+  },
+  {
+    name: "Product",
+    people: [
+      { name: "Brandon Pretorius", title: "Product Specialist", reportsTo: "Jason Pretorius" },
+      { name: "Jade Sivalingam", title: "Business Analyst", reportsTo: "Joshua Edward Stier" },
+      { name: "Joshua Edward Stier", title: "Product Manager", reportsTo: "Jason Pretorius" },
+    ],
+  },
+  {
+    name: "People & Culture",
+    people: [
+      { name: "Bulelwa Tole", title: "People & Culture Officer", reportsTo: "Prashika Murugan" },
+      { name: "Jamila Yeki", title: "People & Culture Administrator", reportsTo: "Prashika Murugan" },
+      { name: "Kate Dawes", title: "Learning & Development Officer", reportsTo: "Prashika Murugan" },
+      { name: "Prashika Murugan", title: "Head of People & Culture", reportsTo: "Steven Spartinos" },
     ],
   },
 ];
