@@ -13,7 +13,7 @@ and keep everything "idiot-proof, as simple as possible" (her design principle).
 - `crm/` — the app. Read `crm/README.md` first, and `crm/AGENTS.md` (this Next.js version differs from
   older ones; check `crm/node_modules/next/dist/docs/` before using a Next API).
 - Pipeline source of truth: the sales playbook in the `kiron-sales-playbook` repo, not `sales_pipeline_process.docx`.
-- `brand/krm-logo.webp` — Kelly's KRM logo. Kiron brand: green #5DCF11, white, dark #181923, black; Open Sauce One.
+- `brand/krm-logo.webp` — Kelly's KRM logo (wordmark, used in the menu). `brand/krm-icon.webp` — the square K icon, used for browser tabs and phone home screens (`crm/src/app/favicon.ico`, `icon.png`, `apple-icon.png`, trimmed from it). Kiron brand: green #5DCF11, white, dark #181923, black; Open Sauce One.
 
 ## Hard rules
 
