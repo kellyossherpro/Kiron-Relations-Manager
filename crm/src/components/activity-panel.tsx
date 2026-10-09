@@ -69,7 +69,7 @@ export function ActivityPanel({
   }
 
   return (
-    <section className="card p-5" aria-label="Activity">
+    <section className="card @container p-5" aria-label="Activity">
       <h2 className="h2 mb-4">Activity</h2>
       {canLog && (
         <div className="mb-6 rounded-lg bg-paper p-4">
@@ -98,7 +98,7 @@ export function ActivityPanel({
               <label className="label" htmlFor="act-body">{isTask ? "Details (optional)" : "Notes"}</label>
               <textarea id="act-body" className="input" rows={3} value={body} onChange={(e) => setBody(e.target.value)} />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 @md:grid-cols-2">
               <div>
                 <label className="label" htmlFor="act-when">{isTask ? "Due date" : "When (leave empty for now)"}</label>
                 <input id="act-when" type={isTask ? "date" : "datetime-local"} className="input" value={when} onChange={(e) => setWhen(e.target.value)} />

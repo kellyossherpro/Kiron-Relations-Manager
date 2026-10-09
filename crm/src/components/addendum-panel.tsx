@@ -73,7 +73,7 @@ export function AddendumPanel({
   }
 
   return (
-    <section className={`card p-5 ${open ? "ring-2 ring-warn/50" : ""}`} aria-label="Addendums">
+    <section className={`card @container p-5 ${open ? "ring-2 ring-warn/50" : ""}`} aria-label="Addendums">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="h2">Addendums</h2>
         {isLive && !open && canRaise && mode !== "raise" && (
@@ -96,7 +96,7 @@ export function AddendumPanel({
           </p>
           <fieldset>
             <legend className="label">What kind of change?</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 @md:grid-cols-2">
               {Object.keys(ADDENDUM_TYPE_LABEL).map((t) => (
                 <label key={t} className={`flex cursor-pointer gap-2 rounded-lg border p-3 text-sm ${type === t ? "border-brand bg-brand-soft/60" : "border-line"}`}>
                   <input type="radio" name="addendum-type" value={t} checked={type === t} onChange={() => setType(t)} className="mt-1 accent-brand" />

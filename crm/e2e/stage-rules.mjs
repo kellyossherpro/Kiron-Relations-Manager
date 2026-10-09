@@ -75,7 +75,7 @@ step("fill in the rest -> moves by itself");
 await page.click("section[aria-label=Details] >> text=Edit");
 await page.fill("#f-amountMonthly", "8000");
 await page.fill("#f-p\\.lead_source", "Trade show");
-await page.click("text=Save changes");
+await page.click("button:has-text('Done')"); // changes save by themselves; Done closes editing
 await page.waitForSelector("text=so the deal moved on");
 await shot("23-deal-moved");
 

@@ -114,7 +114,16 @@ Rules that matter:
   see who opened it). The browser uploads in two steps (start → send the bytes → finish) so big files go
   straight to storage. Removing hides the file and keeps the bytes. `FILE_STORAGE=local` keeps files in
   `.krm-files/` (development); production refuses to store files until `FILE_STORAGE` is set.
-- **Boards and views**: the menu (it folds away with the arrow; remembered in the `krm_nav` cookie) starts with
+- **Menu and deal page**: the menu is a drawer: "› Menu" opens it, picking a page (or Esc, or clicking
+  outside) closes it, so every page uses the full width. Deal pages are laid out like HubSpot: details and stage
+  on the left, activity in the middle, everything linked (handovers, addendums, contacts, files, history) on the
+  right; narrower screens stack them in that order. Panels use container queries (`@container`) so they fit
+  whichever column they're in.
+- **Auto-save**: after "Edit details", each field saves on its own (`record-fields.tsx`): typed fields a second
+  after the last key or when you leave the field, dropdowns and ticks straight away, one save at a time, each
+  with the field's old value so conflicts are still caught per field. A "Changes saved" message pops up
+  bottom-right; a failed save shows under its field. Leaving the page while a save is waiting asks first.
+- **Boards and views**: the menu starts with
   Live board (live clients), Next up (Closed Won, not live yet: handovers, Live date countdown), Priorities and
   Summary. **Priorities** (`deals.priority`, unique while the deal exists): 1 is most important; managers and
   admins set them on the deal or on the board (up/down swaps with the neighbour). **Summary** adds up the

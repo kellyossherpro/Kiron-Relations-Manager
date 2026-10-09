@@ -101,7 +101,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      {/* Like HubSpot: the deal's details on the left, its activity in the middle, everything linked
+          to it on the right. Narrower screens stack them in that order. */}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] xl:grid-cols-[minmax(320px,400px)_minmax(0,1fr)_minmax(280px,340px)]">
         <div className="min-w-0 space-y-5">
           {stage && ["won", "live"].includes(stage.kind) && users.find((u) => u.id === ownerId)?.role !== "account_manager" && (
             <p className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3 text-sm" role="status">
@@ -109,6 +111,14 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             </p>
           )}
           <StageMover dealId={id} current={String(row.stage_key)} stages={stages} allowed={allowedStages} checklist={evaluation?.requirements ?? []} nextLabel={evaluation?.next?.label ?? null} />
+          <RecordFields objectType="deal" recordId={id} fields={clientFields(actor, "deal", ownerId, specs, collabIds)} values={values} lookups={lookups} laterGroups={laterGroups} />
+        </div>
+
+        <div className="min-w-0 space-y-5">
+          <ActivityPanel parent={{ dealId: id }} items={activities} users={userOptions} me={{ id: actor.id, isAdmin: isManager(actor) }} canLog={canLogActivity(actor)} />
+        </div>
+
+        <div className="grid min-w-0 gap-5 lg:col-span-2 lg:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
           {showGoLive && (
             <GoLivePanel
               dealId={id}
@@ -128,13 +138,6 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
               items={addendums.map((a) => ({ ...a, raisedAt: String(a.raisedAt), closedAt: a.closedAt ? String(a.closedAt) : null }))}
             />
           )}
-          <RecordFields objectType="deal" recordId={id} fields={clientFields(actor, "deal", ownerId, specs, collabIds)} values={values} lookups={lookups} laterGroups={laterGroups} />
-          <FilesPanel objectType="deal" objectId={id} files={files.files} hidden={files.hidden} teams={teams}
-            canUpload={canUploadFiles(actor, { ownerId }, { collaboratorIds: collabIds })} />
-          <ActivityPanel parent={{ dealId: id }} items={activities} users={userOptions} me={{ id: actor.id, isAdmin: isManager(actor) }} canLog={canLogActivity(actor)} />
-        </div>
-
-        <div className="min-w-0 space-y-5">
           <section className="card p-5" aria-label="Contacts on this deal">
             <h2 className="h2 mb-3">Contacts</h2>
             {links.contacts.length === 0 ? <p className="text-sm text-muted">No contacts yet.</p> : (
@@ -189,6 +192,8 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
             )}
           </section>
 
+          <FilesPanel objectType="deal" objectId={id} files={files.files} hidden={files.hidden} teams={teams}
+            canUpload={canUploadFiles(actor, { ownerId }, { collaboratorIds: collabIds })} />
           <details className="card p-5">
             <summary className="h2 cursor-pointer">History</summary>
             <div className="mt-3">
