@@ -252,17 +252,21 @@ export async function loadExampleData() {
   await confirmGoLive(fran, kestrelWon, "finance", "Billing set up from the live date");
 
   // Files: a proposal (fees and rates, so not for everyone), a RICE report, and a contract only Legal opens.
-  const proposal = await exampleFile(jo, riverstone, "Riverstone proposal v2.pdf", "proposal", [
-    "Proposal: Riverstone - Shop Estate Rollout", "Example only. Every name and figure is made up.", "", "Setup fee: USD 2,500", "Monthly minimum: USD 1,500", "Flat rate: 10% of GGR",
-  ]);
-  await openFile(fran, proposal);
-  await exampleFile(sam, summit, "Summit RICE report.pdf", "rice_report", [
-    "RICE evaluation: Summit - Custom Racing Feed", "Example only.", "", "Reach 6, Impact 7, Confidence 60%, Effort 4", "Score: 6.3",
-  ]);
-  const legalTeam = lee.teamIds ?? [];
-  await exampleFile(lee, live1, "Northgate agreement (signed).pdf", "contract", [
-    "Services agreement: Northgate - Live Casino", "Example only.", "", "Signed by both parties.",
-  ], "teams", legalTeam);
+  // If file storage isn't reachable (a mistyped key online), the rest of the example company still loads.
+  try {
+    const proposal = await exampleFile(jo, riverstone, "Riverstone proposal v2.pdf", "proposal", [
+      "Proposal: Riverstone - Shop Estate Rollout", "Example only. Every name and figure is made up.", "", "Setup fee: USD 2,500", "Monthly minimum: USD 1,500", "Flat rate: 10% of GGR",
+    ]);
+    await openFile(fran, proposal);
+    await exampleFile(sam, summit, "Summit RICE report.pdf", "rice_report", [
+      "RICE evaluation: Summit - Custom Racing Feed", "Example only.", "", "Reach 6, Impact 7, Confidence 60%, Effort 4", "Score: 6.3",
+    ]);
+    await exampleFile(lee, live1, "Northgate agreement (signed).pdf", "contract", [
+      "Services agreement: Northgate - Live Casino", "Example only.", "", "Signed by both parties.",
+    ], "teams", lee.teamIds ?? []);
+  } catch (e) {
+    console.warn(`Example files skipped: ${e instanceof Error ? e.message : String(e)}`);
+  }
 
   return { deals: 15 };
 }
