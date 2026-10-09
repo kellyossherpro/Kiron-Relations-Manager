@@ -44,14 +44,14 @@ await part(sky, "section[aria-label=Go-live]", "82-support-confirmed");
 
 // 2. The Live board while Kestrel waits on Dev, and filtered to Dev.
 const sam = await as("Sam Sales");
-await sam.goto(`${B}/live`);
+await sam.goto(`${B}/next-up`);
 await settle(sam);
 check(await sam.isVisible("text=3/4"), "board shows 3 of 4");
 await sam.screenshot({ path: `${OUT}/83-live-board.png`, fullPage: true });
 await sam.click("nav[aria-label='Waiting on'] >> text=Finance");
 await sam.waitForSelector("text=Nothing waiting on that department.");
 await sam.click("nav[aria-label='Waiting on'] >> text=Dev");
-await sam.waitForSelector("section[aria-label='Going live'] >> text=Kestrel – Retail Screens");
+await sam.waitForSelector("section[aria-label='Next up'] >> text=Kestrel – Retail Screens");
 
 // 3. Dev (BetMan team, as it's a BetMan Retail deal) confirms last: the deal goes Live by itself.
 const dee = await as("Dee Developer");

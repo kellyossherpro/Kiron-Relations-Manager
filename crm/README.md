@@ -114,6 +114,12 @@ Rules that matter:
   see who opened it). The browser uploads in two steps (start → send the bytes → finish) so big files go
   straight to storage. Removing hides the file and keeps the bytes. `FILE_STORAGE=local` keeps files in
   `.krm-files/` (development); production refuses to store files until `FILE_STORAGE` is set.
+- **Boards and views**: the menu (it folds away with the arrow; remembered in the `krm_nav` cookie) starts with
+  Live board (live clients), Next up (Closed Won, not live yet: handovers, Live date countdown), Priorities and
+  Summary. **Priorities** (`deals.priority`, unique while the deal exists): 1 is most important; managers and
+  admins set them on the deal or on the board (up/down swaps with the neighbour). **Summary** adds up the
+  anticipated monthly amount per stage and overall (a year = 12 months); lost and ended deals stay out of the
+  active total.
 - **Fees and rates** (`commercial` fields) are left out of the page, the values and the history for viewers,
   unless one of their departments "can see fees and rates" (Finance). Other roles always see them.
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.

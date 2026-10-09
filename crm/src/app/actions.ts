@@ -23,6 +23,7 @@ import { createRecord, deleteRecord, moveDealStage, restoreRecord, updateRecord,
 import { requireActor, signInAs, signOut } from "@/lib/session";
 import { GATE_COOKIE, gateToken, passwordMatches, safeNext } from "@/lib/site-gate";
 import { applyKironPipeline } from "@/lib/kiron-pipeline";
+import { movePriority, setPriority } from "@/lib/priorities";
 import { finishImport, importChunk, startImport, undoImport, type ChunkInput, type RowResult } from "@/lib/import/run";
 import type { ImportObject, Target } from "@/lib/import/plan";
 import { deleteFile, finishUpload, startUpload, type StartUpload } from "@/lib/files";
@@ -287,6 +288,22 @@ export async function updateFieldAction(
 ): Promise<ActionResult> {
   const actor = await requireActor();
   const res = await attempt(() => updateFieldDefinition(actor, id, input));
+  refresh();
+  return res;
+}
+
+// ---------- priorities ----------
+
+export async function setPriorityAction(dealId: string, priority: number | null): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => setPriority(actor, dealId, priority));
+  refresh();
+  return res;
+}
+
+export async function movePriorityAction(dealId: string, direction: "up" | "down"): Promise<ActionResult> {
+  const actor = await requireActor();
+  const res = await attempt(() => movePriority(actor, dealId, direction));
   refresh();
   return res;
 }

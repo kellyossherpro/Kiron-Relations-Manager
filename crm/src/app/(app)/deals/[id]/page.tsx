@@ -14,10 +14,12 @@ import { DEAL_CONTACT_ROLES } from "@/db/schema";
 import { NotFoundError } from "@/lib/errors";
 import { DEAL_CONTACT_ROLE_LABEL, plural } from "@/lib/format";
 import { dealAddendums } from "@/lib/addendums";
-import { canUploadFiles, canConfirmGoLive, canDelete, canEditRecord, canFinishAddendum, canLogActivity, canMoveStage, canRaiseAddendum, isManager } from "@/lib/permissions";
+import { canSetPriority, canUploadFiles, canConfirmGoLive, canDelete, canEditRecord, canFinishAddendum, canLogActivity, canMoveStage, canRaiseAddendum, isManager } from "@/lib/permissions";
 import { companyOptions, contactOptions, dealDaysInStage, getDealLinks, getRecord, listActivities, listHistory, listStages, listUsers } from "@/lib/queries";
 import { requireActor } from "@/lib/session";
 import { listFiles } from "@/lib/files";
+import { takenPriorities } from "@/lib/priorities";
+import { PriorityPicker } from "@/components/priority-picker";
 import { teamOptions } from "@/lib/teams";
 import { FilesPanel } from "@/components/files-panel";
 import { isShown } from "@/lib/conditions";
@@ -36,7 +38,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     throw e;
   }
   const { row, specs, values, hidden } = visibleRecord(actor, record);
-  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation, addendums, buttons, files, teams] = await Promise.all([
+  const [links, stages, users, companies, contacts, activities, history, daysInStage, evaluation, addendums, buttons, files, teams, taken] = await Promise.all([
     getDealLinks(id),
     listStages(),
     listUsers(),
@@ -50,7 +52,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     dealButtons(),
     listFiles(actor, "deal", id),
     teamOptions(),
+    takenPriorities(),
   ]);
+  const priority = (row.priority as number | null) ?? null;
   const goLive = (await goLiveChecks(db, [{ id, properties: row.properties as Record<string, unknown> }])).get(id) ?? [];
   const shownButtons = buttons.filter((b) => isShown({ key: "", showWhen: b.showWhen }, values));
   const collabIds = links.collaborators.map((c) => c.id);
@@ -81,6 +85,13 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           <p className="mt-1 text-sm text-muted">
             {stage?.label} · {plural(daysInStage, "day")} in this stage · Owner: {users.find((u) => u.id === ownerId)?.name ?? "nobody"}
           </p>
+          <div className="mt-2">
+            {canSetPriority(actor) ? (
+              <PriorityPicker dealId={id} current={priority} taken={Object.fromEntries(Object.entries(taken).filter(([, d]) => d.id !== id).map(([n, d]) => [n, d.name]))} />
+            ) : priority !== null ? (
+              <span className="pill bg-ink text-white">Priority {priority}</span>
+            ) : null}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {shownButtons.map((b) => (
@@ -181,7 +192,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
           <details className="card p-5">
             <summary className="h2 cursor-pointer">History</summary>
             <div className="mt-3">
-              <HistoryList entries={visibleHistory(history, hidden)} labels={Object.fromEntries(specs.map((s) => [s.key, s.label]))} stageLabels={stageLabels} names={names} moneyFields={specs.filter((s) => s.type === "money").map((s) => s.key)} />
+              <HistoryList entries={visibleHistory(history, hidden)} labels={{ ...Object.fromEntries(specs.map((s) => [s.key, s.label])), priority: "Priority" }} stageLabels={stageLabels} names={names} moneyFields={specs.filter((s) => s.type === "money").map((s) => s.key)} />
             </div>
           </details>
         </div>
