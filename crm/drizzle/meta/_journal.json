@@ -85,6 +85,13 @@
       "when": 1791470496659,
       "tag": "0011_hubspot_import",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791545214982,
+      "tag": "0012_deal_priority",
+      "breakpoints": true
     }
   ]
 }

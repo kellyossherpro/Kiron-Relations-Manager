@@ -11,6 +11,7 @@ import { createRecord, updateRecord, withTx } from "@/lib/records";
 import { askForGoLive, askForSignOffs, runDailyRules } from "@/lib/stage-engine";
 import { addTeamMember, createTeam, TECH_REVIEWERS, updateTeam } from "@/lib/teams";
 import { confirmGoLive } from "@/lib/go-live";
+import { setPriority } from "@/lib/priorities";
 import { finishUpload, openFile, receiveUpload, startUpload, type FileAccess, type FileCategory } from "@/lib/files";
 import { fileStore } from "@/lib/storage";
 
@@ -246,6 +247,9 @@ export async function loadExampleData() {
   await runDailyRules();
   await raiseAddendum(alex, live3, { type: "new_product", details: "Add the new scratchcard range to their site from next month." });
   await withTx((tx) => askForSignOffs(tx, harbour)); // Harbour waits on the technical review
+  // The company's top deals, in order.
+  for (const [i, id] of [summit, bluebay2, riverstone, harbour, northgate].entries()) await setPriority(admin, id, i + 1);
+
   // Kestrel is going live: Legal and Finance have confirmed, Support and Dev haven't yet.
   await withTx((tx) => askForGoLive(tx, kestrelWon));
   await confirmGoLive(lee, kestrelWon, "legal");

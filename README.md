@@ -4,7 +4,7 @@ In-house CRM to replace HubSpot, built as a standalone app (decision 2026-10-07 
 
 ## Documents
 
-- **Blueprint questions (live page):** https://claude.ai/artifact/9PQyT2yfhPTMQktv1rsphb — Kelly answers there; Claude reads the answers, replies and records decisions. Decisions are copied into `crm-design.md`. Page data: `questions` (Claude writes; `decision` + `decidedAt` when settled), `thread` (one doc per message: `qid`, `author` kelly|claude, `choice`, `text`, `at`; never overwritten), `meta/roadmap` (layers). `answers` and `notes` are the round-1 originals, kept as a backup.
+- **Blueprint questions (live page):** https://claude.ai/artifact/9PQyT2yfhPTMQktv1rsphb — Kelly answers there; Claude reads the answers, replies and records decisions. Decisions are copied into `crm-design.md`. Page data: `questions` (Claude writes; `decision` + `decidedAt` when settled), `thread` (one doc per message: `qid`, `author` kelly|claude, `choice`, `text`, `at`; never overwritten), `meta/roadmap` (layers), `mynotes` (Kelly's own notes on the "My notes" tab: `title`, `text`, `pinned`, `createdAt`, `updatedAt`; only editors write). `answers` and `notes` are the round-1 originals, kept as a backup.
 
 - **crm-design.md** — design notes: the why, the shape, the architecture.
 - **crm-questions-for-patrick.md** — *superseded* (portal plan dropped); kept for reference.

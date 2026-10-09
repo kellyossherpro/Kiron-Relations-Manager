@@ -1,0 +1,2 @@
+ALTER TABLE "deals" ADD COLUMN "priority" integer;--> statement-breakpoint
+CREATE UNIQUE INDEX "deals_priority_unique" ON "deals" USING btree ("priority") WHERE "deals"."deleted_at" is null and "deals"."priority" is not null;

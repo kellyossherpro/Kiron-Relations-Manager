@@ -104,3 +104,8 @@ export function canOpenFile(actor: Actor, file: FileAccessInfo) {
 export function canDeleteFile(actor: Actor, file: { uploadedBy: string }) {
   return actor.role === "admin" || file.uploadedBy === actor.id;
 }
+
+// Deal priorities are one company-wide ranking, so managers and admins set them.
+export function canSetPriority(actor: Actor) {
+  return isManager(actor);
+}

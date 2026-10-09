@@ -124,9 +124,12 @@ export const deals = pgTable(
     amountMonthly: numeric("amount_monthly", { precision: 14, scale: 2 }),
     primaryCompanyId: uuid("primary_company_id").references(() => companies.id),
     viaAggregatorId: uuid("via_aggregator_id").references(() => companies.id),
+    // 1 = most important. Each number belongs to one deal at a time (the Priorities board).
+    priority: integer("priority"),
   },
   (t) => [
     index("deals_stage_idx").on(t.stageKey),
+    uniqueIndex("deals_priority_unique").on(t.priority).where(sql`${t.deletedAt} is null and ${t.priority} is not null`),
     index("deals_owner_idx").on(t.ownerId),
     uniqueIndex("deals_hubspot_unique").on(t.hubspotId).where(sql`${t.deletedAt} is null and ${t.hubspotId} is not null`),
   ],
