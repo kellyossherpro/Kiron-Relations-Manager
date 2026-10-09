@@ -5,6 +5,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   cacheComponents: false,
   devIndicators: false,
+  // The online test version builds on a small free machine: there the type check is skipped (it already
+  // ran before the code was committed: npm run typecheck).
+  typescript: { ignoreBuildErrors: process.env.LIGHT_BUILD === "1" },
   turbopack: {
     rules: {
       "*.css": {

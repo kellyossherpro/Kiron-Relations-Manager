@@ -1,0 +1,31 @@
+# The online TEST version of KRM on Render's free plan (made-up example data, behind a password).
+# Render → New → Blueprint → this repository: it creates the service below and asks for the four
+# secret values (sync: false). Steps in crm/README.md → "Online test version".
+services:
+  - type: web
+    name: krm-test
+    runtime: node
+    plan: free
+    region: frankfurt # next to the Supabase database (Central EU)
+    rootDir: crm
+    buildCommand: npm ci && npm run online-build
+    startCommand: ./node_modules/.bin/next start # directly, without npm: less memory on the 512 MB free plan
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: AUTH_MODE
+        value: dev # the "pick who you are" sign-in; test only
+      - key: EXAMPLE_DATA
+        value: "1" # load the made-up example company into the empty database
+      - key: FILE_STORAGE
+        value: supabase
+      - key: CRON_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # Supabase → Connect → Session pooler, with the database password filled in
+      - key: SITE_PASSWORD
+        sync: false # the password testers type first
+      - key: SUPABASE_URL
+        sync: false # Supabase → Project Settings → Data API → Project URL
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # Supabase → Project Settings → API Keys → Secret key (sb_secret_…)

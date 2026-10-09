@@ -119,28 +119,31 @@ Rules that matter:
 - **Daily rules** run from `/api/cron/daily` (header `Authorization: Bearer $CRON_SECRET`), once a day.
 - **Sign-in** is a development picker (`AUTH_MODE=dev`). Microsoft sign-in replaces it before go-live.
 
-## Online test version (Vercel + Supabase)
+## Online test version (Render + Supabase, both free)
 
-A test copy with made-up data, behind a shared password. Supabase project in Central EU (Frankfurt); Vercel
-runs the app in Frankfurt too (`regions` in `vercel.json`), next to the database. Vercel runs `npm run vercel-build`, which
-applies migrations, loads the example company if `EXAMPLE_DATA=1` and the database is empty, then builds.
-Project settings: Root Directory `crm`. Environment variables:
+A test copy with made-up data, behind a shared password, at no cost: Vercel's free plan is for
+non-commercial use only, so the test version runs on Render's free plan (it sleeps after 15 minutes
+without visitors; the next visit takes about a minute). Supabase (free) holds the database and files, in
+Central EU (Frankfurt); the Render service runs in Frankfurt too.
+
+1. **Supabase**: new project in Central EU (Frankfurt); Storage → New bucket `krm-files`, **Public off**.
+2. **Render**: New → **Blueprint** → this repository. `render.yaml` (repo root) creates the `krm-test`
+   service (root directory `crm`, build `npm ci && npm run online-build`, which applies migrations, loads
+   the example company into an empty database, then builds). Render asks for:
 
 | Name | Value |
 |---|---|
-| `DATABASE_URL` | Supabase → Connect → **Session pooler** connection string, with the database password filled in |
-| `AUTH_MODE` | `dev` (the "pick who you are" sign-in; test only) |
+| `DATABASE_URL` | Supabase → **Connect** → **Session pooler** connection string, with the database password filled in |
 | `SITE_PASSWORD` | the password testers type first |
-| `CRON_SECRET` | any long random string (Vercel sends it to `/api/cron/daily`, scheduled in `vercel.json`) |
-| `EXAMPLE_DATA` | `1` to load the example company into an empty database |
-| `FILE_STORAGE` | `supabase` |
-| `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API Keys → a **Secret** key (`sb_secret_…`), or the legacy `service_role` key. Only ever in Vercel's settings |
+| `SUPABASE_URL` | Supabase → Project Settings → Data API → Project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API Keys → a **Secret** key (`sb_secret_…`), or the legacy `service_role` key |
 
-Files also need a bucket: Supabase → Storage → **New bucket**, name `krm-files`, **Public: off**. KRM never makes
-files public: each download is checked and logged, then served through a link that works for one minute.
-The Supabase upload/download calls are covered by tests with a stand-in, not yet against a real project:
-check adding and opening a file once the test version is up.
+`render.yaml` sets the rest: `AUTH_MODE=dev`, `EXAMPLE_DATA=1`, `FILE_STORAGE=supabase`, a generated
+`CRON_SECRET`. The daily rules (`/api/cron/daily`) aren't scheduled on the free plan; call it by hand with
+the secret if needed. `vercel.json` is kept for a later paid Vercel setup (`npm run vercel-build`).
+Files: KRM never makes them public; each download is checked and logged, then served through a link that
+works for one minute. The Supabase upload/download calls are covered by tests with a stand-in: check
+adding and opening a file once the test version is up.
 
 Before any real data: Microsoft sign-in instead of `AUTH_MODE=dev`, remove `SITE_PASSWORD`, and verify
 Supabase's certificate in `src/db/config.ts`.
