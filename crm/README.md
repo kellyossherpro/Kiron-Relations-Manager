@@ -121,7 +121,8 @@ Rules that matter:
 
 ## Online test version (Vercel + Supabase)
 
-A test copy with made-up data, behind a shared password. Vercel runs `npm run vercel-build`, which
+A test copy with made-up data, behind a shared password. Supabase project in Central EU (Frankfurt); Vercel
+runs the app in Frankfurt too (`regions` in `vercel.json`), next to the database. Vercel runs `npm run vercel-build`, which
 applies migrations, loads the example company if `EXAMPLE_DATA=1` and the database is empty, then builds.
 Project settings: Root Directory `crm`. Environment variables:
 
@@ -134,7 +135,7 @@ Project settings: Root Directory `crm`. Environment variables:
 | `EXAMPLE_DATA` | `1` to load the example company into an empty database |
 | `FILE_STORAGE` | `supabase` |
 | `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` key (secret: only ever in Vercel's settings) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API Keys → a **Secret** key (`sb_secret_…`), or the legacy `service_role` key. Only ever in Vercel's settings |
 
 Files also need a bucket: Supabase → Storage → **New bucket**, name `krm-files`, **Public: off**. KRM never makes
 files public: each download is checked and logged, then served through a link that works for one minute.
