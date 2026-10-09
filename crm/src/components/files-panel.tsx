@@ -86,7 +86,7 @@ export function FilesPanel({
   }
 
   return (
-    <section className="card p-5" aria-label="Files">
+    <section className="card @container p-5" aria-label="Files">
       <h2 className="h2 mb-3">Files{files.length > 0 && ` (${files.length})`}</h2>
       {files.length === 0 && !hidden && <p className="text-sm text-muted">No files yet.{canUpload && " Add the proposal, the RICE report or the contract here."}</p>}
       {files.length > 0 && (
@@ -148,7 +148,7 @@ export function FilesPanel({
             <span className="text-xs text-muted">{file ? size(file.size) : "PDF, Word, Excel, PowerPoint, images, up to 50 MB"}</span>
             <input id={`file-${objectId}`} ref={input} type="file" accept={ACCEPT} className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 @md:grid-cols-2">
             <div>
               <label className="label" htmlFor={`file-cat-${objectId}`}>What is it?</label>
               <select id={`file-cat-${objectId}`} className="input" value={category} onChange={(e) => pickCategory(e.target.value as Category)}>

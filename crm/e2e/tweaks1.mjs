@@ -20,20 +20,20 @@ async function as(name) {
 const settle = async (p) => { await p.waitForLoadState("networkidle"); await p.addStyleTag({ content: ".ticker, .blink { animation: none !important; }" }); await p.waitForTimeout(250); };
 
 const admin = await as("Admin Example");
-// Menu: Live board first; fold it away and back.
+// Menu: it slides out from the Menu button, Live board first, and closes when a page is picked.
 await admin.goto(`${B}/live`);
 await settle(admin);
-const first = await admin.locator("nav >> a").first().textContent();
-check(first?.trim() === "Live board", `Live board is first in the menu (${first})`);
+check(!(await admin.isVisible("aside[aria-label=Menu]")), "pages open with the menu closed, using the whole width");
 await admin.screenshot({ path: `${OUT}/110-live-board.png` });
-await admin.click("button[aria-label='Hide the menu']");
-await admin.waitForSelector("button[aria-label='Show the menu']");
-await settle(admin);
-await admin.screenshot({ path: `${OUT}/111-menu-hidden.png` });
-await admin.reload();
-check(await admin.isVisible("button[aria-label='Show the menu']"), "the menu stays hidden after a reload");
-await admin.click("button[aria-label='Show the menu']");
-await admin.waitForSelector("button[aria-label='Hide the menu']");
+await admin.click("button[aria-label='Open the menu']");
+await admin.waitForSelector("aside[aria-label=Menu]");
+const first = await admin.locator("aside[aria-label=Menu] nav a").first().textContent();
+check(first?.trim() === "Live board", `Live board is first in the menu (${first})`);
+await admin.screenshot({ path: `${OUT}/111-menu-open.png` });
+await admin.click("aside[aria-label=Menu] >> text=Next up");
+await admin.waitForURL(/next-up/);
+await admin.waitForSelector("aside[aria-label=Menu]", { state: "detached" });
+check(true, "picking a page closes the menu");
 
 await admin.goto(`${B}/next-up`);
 await settle(admin);

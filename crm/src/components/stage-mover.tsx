@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+
+const SHORT_LIST = 6; // checklist items shown before "Show all"
 import { moveStageAction } from "@/app/actions";
 
 type Stage = { key: string; label: string; kind: string };
@@ -11,6 +13,7 @@ type Stage = { key: string; label: string; kind: string };
 export function StageMover({ dealId, current, stages, allowed, checklist, nextLabel }: { dealId: string; current: string; stages: Stage[]; allowed: string[]; checklist: { id: string; label: string; met: boolean }[]; nextLabel: string | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [to, setTo] = useState("");
   const [reason, setReason] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export function StageMover({ dealId, current, stages, allowed, checklist, nextLa
   }
 
   return (
-    <section className="card p-5" aria-label="Stage">
+    <section className="card @container p-5" aria-label="Stage">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="label">Stage</p>
@@ -75,14 +78,20 @@ export function StageMover({ dealId, current, stages, allowed, checklist, nextLa
                 ? nextLabel ? `Everything is filled in.` : "Everything is filled in. There's no next stage set, so move it by hand."
                 : `Needed before it moves${nextLabel ? ` to ${nextLabel}` : " on"} (${checklist.filter((c) => !c.met).length} of ${checklist.length} left):`}
             </p>
-            <ul className="grid gap-1 sm:grid-cols-2">
-              {checklist.map((c) => (
+            <ul className="grid gap-1 @md:grid-cols-2">
+              {/* Still-missing items first; a long list is cut short until "Show all". */}
+              {[...checklist].sort((x, y) => Number(x.met) - Number(y.met)).slice(0, showAll ? undefined : SHORT_LIST).map((c) => (
                 <li key={c.id} className={`flex items-start gap-2 text-sm ${c.met ? "text-muted" : "font-semibold"}`}>
                   <span aria-hidden className={`mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${c.met ? "bg-brand text-ink" : "border-2 border-warn"}`}>{c.met ? "✓" : ""}</span>
                   <span>{c.label}<span className="sr-only">{c.met ? " (done)" : " (missing)"}</span></span>
                 </li>
               ))}
             </ul>
+            {checklist.length > SHORT_LIST && (
+              <button type="button" className="mt-2 text-xs font-bold text-brand-dark hover:underline" onClick={() => setShowAll((v) => !v)}>
+                {showAll ? "Show less" : `Show all ${checklist.length}`}
+              </button>
+            )}
           </>
         )}
       </div>

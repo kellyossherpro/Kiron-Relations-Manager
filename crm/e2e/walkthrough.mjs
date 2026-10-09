@@ -89,7 +89,8 @@ await page.click("text=Add task"); await page.waitForSelector("text=Send the pro
 step("edit details");
 await page.click("section[aria-label=Details] >> text=Edit");
 await page.selectOption("#f-p\\.billing_currency", "USD");
-await page.click("text=Save changes");
+await page.waitForSelector("text=Changes saved"); // saved as soon as it was picked
+await page.click("button:has-text('Done')");
 await page.waitForSelector("section[aria-label=Details] >> text=USD");
 await shot("05-deal");
 
@@ -103,14 +104,14 @@ await p2.goto(dealUrl);
 await page.click("section[aria-label=Details] >> text=Edit");
 await p2.click("section[aria-label=Details] >> text=Edit");
 await page.fill("#f-amountMonthly", "30000");
-await p2.fill("#f-amountMonthly", "40000");
-await page.click("text=Save changes");
+await page.click("button:has-text('Done')");
 await page.waitForSelector("section[aria-label=Details] >> text=$30,000");
-await p2.click("text=Save changes");
+await p2.fill("#f-amountMonthly", "40000");
 await p2.waitForSelector("text=Someone else changed this field while you were editing", { timeout: 8000 });
 await p2.screenshot({ path: `${OUT}/06-conflict.png`, fullPage: false, clip: undefined });
 await p2.click("text=Keep mine");
-await p2.click("text=Save changes");
+await p2.waitForSelector("text=Changes saved");
+await p2.click("button:has-text('Done')");
 await p2.waitForSelector("section[aria-label=Details] >> text=$40,000");
 
 step("history");

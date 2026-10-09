@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { signOutAction } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
 import { NavLink } from "@/components/nav-link";
@@ -12,30 +11,29 @@ import { goLiveWaiting } from "@/lib/go-live";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireActor();
-  const [unread, addendums, signOffs, handovers, jar] = await Promise.all([
-    unreadCount(actor.id), openAddendumCount(), signOffsWaiting(actor.teamIds ?? []), goLiveWaiting(actor.teamIds ?? []), cookies(),
+  const [unread, addendums, signOffs, handovers] = await Promise.all([
+    unreadCount(actor.id), openAddendumCount(), signOffsWaiting(actor.teamIds ?? []), goLiveWaiting(actor.teamIds ?? []),
   ]);
   const waiting = signOffs.length + handovers.length;
   return (
     <AppShell
-      initialCollapsed={jar.get("krm_nav")?.value === "closed"}
       brand={
         <Link href="/live" aria-label="KRM home" className="flex min-w-0 items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/krm-icon.png" alt="" className="h-10 w-10 shrink-0 lg:h-12 lg:w-12" />
+          <img src="/krm-icon.png" alt="" className="h-12 w-12 shrink-0" />
           <span className="min-w-0 leading-tight">
-            <span className="block text-xl font-black tracking-tight text-white lg:text-2xl">KRM</span>
-            <span className="block text-[10px] font-bold tracking-[0.1em] whitespace-nowrap text-brand uppercase lg:text-[9px] lg:tracking-[0.06em]">Kiron Relations Manager</span>
+            <span className="block text-2xl font-black tracking-tight text-white">KRM</span>
+            <span className="block text-[9px] font-bold tracking-[0.08em] whitespace-nowrap text-brand uppercase">Kiron Relations Manager</span>
           </span>
         </Link>
       }
       nav={
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:px-3">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-3">
           <NavLink href="/live">Live board</NavLink>
           <NavLink href="/next-up">Next up</NavLink>
           <NavLink href="/priorities">Priorities</NavLink>
           <NavLink href="/summary">Summary</NavLink>
-          <span className="mx-3 my-1 hidden border-t border-white/10 lg:block" aria-hidden="true" />
+          <span className="mx-3 my-1 border-t border-white/10" aria-hidden="true" />
           <NavLink href="/deals">Deals</NavLink>
           <NavLink href="/companies">Companies</NavLink>
           <NavLink href="/contacts">Contacts</NavLink>
@@ -55,7 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </nav>
       }
       account={
-        <div className="hidden border-t border-white/10 px-5 py-4 lg:block">
+        <div className="border-t border-white/10 px-5 py-4">
           <p className="text-sm font-bold text-white">{actor.name}</p>
           <p className="text-xs text-white/60">{ROLE_LABEL[actor.role]}</p>
           <form action={signOutAction} className="mt-3">
@@ -68,9 +66,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <form action="/search" className="min-w-0 flex-1">
             <label htmlFor="global-search" className="sr-only">Search</label>
             <input id="global-search" name="q" placeholder="Search deals, companies and contacts" className="input max-w-xl" />
-          </form>
-          <form action={signOutAction} className="lg:hidden">
-            <button className="text-xs font-bold text-muted uppercase">Sign out</button>
           </form>
         </>
       }

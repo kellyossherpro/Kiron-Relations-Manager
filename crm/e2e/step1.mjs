@@ -35,7 +35,7 @@ await sam.locator("section[aria-label=Details]").screenshot({ path: `${OUT}/51-c
 await sam.goto(`${B}/deals/${dealId("Bluebay – Online Casino Games")}`);
 await sam.click("section[aria-label=Details] >> text=Edit");
 await sam.fill("#f-amountMonthly", "60000");
-await sam.click("text=Save changes");
+await sam.click("button:has-text('Done')");
 await sam.waitForSelector("section[aria-label=Details] >> text=$60,000");
 await sam.click("summary:has-text('Later stages')"); // the tier sits in a Qualified Lead section
 await sam.waitForSelector("section[aria-label=Details] >> text=Tier 1");
@@ -50,8 +50,8 @@ await admin.click("section[aria-label=Details] >> text=Edit");
 await admin.selectOption("#f-p\\.agreement_drafted_and_sent", "yes");
 await admin.selectOption("#f-p\\.cdd_kyc_complete", "yes");
 await admin.selectOption("#f-p\\.agreement_signed_internally", "yes");
-await admin.click("text=Save changes");
-await admin.waitForSelector("text=so the deal moved on");
+await admin.waitForSelector("text=so the deal moved on"); // each answer saved by itself; the last one moved the deal
+await admin.click("button:has-text('Done')");
 console.log("stage now:", psql(`select stage_key from deals where id = '${id}'`), "| owner:", psql(`select u.name from deals d join users u on u.id = d.owner_id where d.id = '${id}'`));
 await admin.evaluate(() => window.scrollTo(0, 0));
 await settle(admin);
