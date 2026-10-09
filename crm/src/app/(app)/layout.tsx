@@ -20,9 +20,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppShell
       initialCollapsed={jar.get("krm_nav")?.value === "closed"}
       brand={
-        <Link href="/deals" aria-label="KRM home" className="min-w-0">
+        <Link href="/live" aria-label="KRM home" className="flex min-w-0 items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/krm-logo-compact.png" alt="KRM" className="h-9 w-auto lg:h-auto lg:w-full" />
+          <img src="/krm-icon.png" alt="" className="h-10 w-10 shrink-0 lg:h-12 lg:w-12" />
+          <span className="min-w-0 leading-tight">
+            <span className="block text-xl font-black tracking-tight text-white lg:text-2xl">KRM</span>
+            <span className="block text-[10px] font-bold tracking-[0.1em] whitespace-nowrap text-brand uppercase lg:text-[9px] lg:tracking-[0.06em]">Kiron Relations Manager</span>
+          </span>
         </Link>
       }
       nav={

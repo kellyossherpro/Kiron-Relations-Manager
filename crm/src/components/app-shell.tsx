@@ -23,12 +23,12 @@ export function AppShell({ initialCollapsed, brand, nav, account, header, childr
     <div className="min-h-screen lg:flex">
       {!collapsed && (
         <aside className="bg-black lg:fixed lg:inset-y-0 lg:flex lg:w-60 lg:flex-col" aria-label="Menu">
-          <div className="flex items-center justify-between gap-3 px-4 py-4 lg:px-5 lg:py-6">
+          <div className="relative flex items-center justify-between gap-3 px-4 py-4 lg:block lg:px-4 lg:pt-6 lg:pb-5">
             {brand}
             <button
               type="button"
               onClick={() => toggle(true)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white lg:absolute lg:top-2 lg:right-2"
               aria-label="Hide the menu"
               title="Hide the menu"
             >
